@@ -3,6 +3,9 @@ import cv2
 import math
 import numpy as np
 import geojson
+from PIL import Image, ImageDraw
+from tqdm import tqdm
+import json
 
 from downloader import main as download_map, wgs_to_tile
 from OSM_extract_geojson import main as osmextract
@@ -10,18 +13,19 @@ from OSM_extract_geojson import main as osmextract
 
 # ============================= Редактируемый блок =============================
 # Задайте координаты области и масштабирование
-BOUNDS = [40.7137, 40.7046, -74.0303, -74.0422] # north, south, east, west
-ZOOM = 17
+BOUNDS = [39.86528203125, 39.854295703125, 116.07587265625, 116.0539] # north, south, east, west # NewYork
+# BOUNDS = [54.8635, 54.8443, 82.8836, 82.8359] # north, south, east, west # NSK
+ZOOM = 18
 
 # имя файлов 
-SAVENAME = 'data/NewYork'
+SAVENAME = 'data/test'
 
 # параметры отрисовки
 rectangle=True # ограничивающая рамка (для html файла)
 simple_palette=True # Простая палитра
 # thickness = 1
 # isClosed = False
-blackback=False, # затемнение фона
+blackback=True # затемнение фона
 opacity=1 # Прозрачность разметки
 
 # Задайте искомые тэги объектов
@@ -29,7 +33,9 @@ tags={'highway': True,
     'building': True,
     'natural': True,
     'landuse': True,
-    'water': True}
+    'water': True,
+    'tourism': True,
+    'leisure': True}
 # ==============================================================================
 
 # ======================== Блок исполнительных функций ========================
@@ -62,19 +68,43 @@ def HEX2RGB(hex_color):
     
     return (r, g, b)
 
-def draw_mask(image, mask, color, type, blackback=False, opacity=0.2):
-    if type == 'Point':
+def draw_mask(image, mask, color, objtype, blackback=False, opacity=0.2):
+    if objtype == 'Point':
         pass
-    elif type == 'LineString':
+    elif objtype == 'LineString':
         isClosed = False
         cv2.polylines(image, 
                     mask, 
                     isClosed,  
                     color,
-                    thickness=1)
-    elif type == 'Polygon':
-        image = create_mask(image, mask, color, opacity)
+                    thickness=3)
+    elif objtype == 'Polygon':
+        image = Image.fromarray(image)
+        image = create_mask2(image, mask, color, opacity)
     return image
+
+def create_mask2(image, mask, color, alpha):
+    obj = []
+    # print(mask[0])
+    for x,y in mask[0]:
+        obj.append((x,y))
+
+    # Create a new Image with the same size as the original image
+    mask_image = Image.new("RGBA", image.size)
+
+    # Create an ImageDraw object for the mask
+    mask_draw = ImageDraw.Draw(mask_image)
+
+    # Draw the polygon mask with the specified color and transparency
+    mask_draw.polygon(obj, fill=(color[0], color[1], color[2], 255))
+
+    # Paste the mask onto the original image
+    image.paste(mask_image, (0, 0), mask_image)
+
+    # Optionally, display the result
+    # image.show()
+
+    return np.array(image)
 
 def create_mask(image, mask, color, alpha):
     # Initialize blank mask image of same dimensions for drawing the shapes
@@ -101,20 +131,58 @@ def create_blackback(shape):
 
     return np.asarray(black_image)
 
+def draw_img(polygon_coordinates, bounds_coords, bounds_pxls, 
+             mask_type, map_obj, palette, img):
+    pixels = [geocoordinates_to_pixels(coord, 
+                                    bounds_coords, 
+                                    bounds_pxls) for coord in polygon_coordinates]
+    HEXcolor = map_obj['properties']['color']
+    if HEXcolor not in palette:
+        palette[HEXcolor] = HEX2RGB(HEXcolor)
+    color = palette[HEXcolor]
+    
+    metainfo = {'tag':map_obj['properties']['tag'], 
+                 'subtag': map_obj['properties']['subtag'], 
+                 'coords': pixels, 
+                 'color': color}
+    img = draw_mask(img, np.int32([pixels]), color, mask_type, 
+                blackback=blackback, opacity=opacity)
+    return img, metainfo
+
+# Сортировка типов для правильного порядка отрисовки:
+def custom_sort_key(item):
+    geometry_type = item['geometry']['type']
+    tag = item['properties']['tag']
+
+    tag_order = {'landuse': 0, 'water': 1, 'building': 2, 'highway': 3, 'nature': 4}
+    
+    if geometry_type == 'Multipolygon':
+        return (0, tag_order.get(tag, 5))
+    elif geometry_type == 'Polygon':
+        return (1, tag_order.get(tag, 5))
+    else:
+        return (2, tag_order.get(tag, 5))
 
 # =============================================================================
 
-def sam():
+def sam(SAVENAME, BOUNDS, ZOOM, tags):
     # Загрузка аннотаций OpenStreetMaps и создание html-файла
     if not os.path.exists(f'{SAVENAME}.geojson'):    
         osmextract(SAVENAME, BOUNDS, tags, opacity, 
-                   ZOOM, blackback, rectangle, simple_palette)
+                   ZOOM, rectangle, simple_palette)
     # -------------------------------------------------------------------------
 
     # Чтение аннотаций
     with open(f'{SAVENAME}.geojson') as f:
         gj = geojson.load(f)
-    features = gj['features']
+    # features = gj['features']
+
+    # Сортировка аннотаций для корректной отрисовки
+    features = []
+    for obj in gj['features']:
+        if obj['geometry']['type'] != 'Point':
+            features.append(obj) 
+    features = sorted(features, key=custom_sort_key)
 
     # Границы искомой области
     n, s, e, w = BOUNDS
@@ -134,9 +202,6 @@ def sam():
     path = f'{SAVENAME}_{idx}_{lat}_{long}_{D_LAT}_{D_LONG}_{STYLE}_{ZOOM}.bmp'
     if not os.path.isfile(path):
         download_map(left, top, right, bottom, ZOOM, path, STYLE, SERVER)
-        # sat = cv2.imread(path)
-        # cv2.imshow(f'{SAVENAME}', sat)
-        # cv2.waitKey(0)
     # -----------------------------------------------------------------------------
     
     # Определение границ сформированного из тайлов изображения
@@ -157,31 +222,62 @@ def sam():
         img = create_blackback(img.shape[:2])
 
     palette = {}
+    mask_info = []
     # Преобразование мировых координат объекта в пиксели
-    for map_obj in features:
+    for map_obj, _ in zip(features, tqdm(range(len(features)))):
         mask_type = map_obj['geometry']['type']
         if mask_type == 'Point':
             continue
         elif mask_type == 'LineString':
-            polygon_coordinates = map_obj['geometry']['coordinates']
+            coordinates = map_obj['geometry']['coordinates']
         elif mask_type == 'Polygon':
-            polygon_coordinates = map_obj['geometry']['coordinates'][0]
-        polygon_pixels = [geocoordinates_to_pixels(coord, 
-                                                   bounds_coords, 
-                                                   bounds_pxls) for coord in polygon_coordinates]
-        
-        HEXcolor = map_obj['properties']['color']
-        if HEXcolor not in palette:
-            palette[HEXcolor] = HEX2RGB(HEXcolor)
-        color = palette[HEXcolor]
-        
-        img = draw_mask(img, np.int32([polygon_pixels]), color, mask_type, 
-                  blackback=blackback, opacity=opacity)
+            coordinates = map_obj['geometry']['coordinates'][0]
+        elif mask_type == 'MultiPolygon':
+            mask_type = 'Polygon'
+            for polygon in map_obj['geometry']['coordinates']:
+                coordinates = polygon[0]
+                img, metainfo = draw_img(coordinates, 
+                            bounds_coords, 
+                            bounds_pxls,
+                            mask_type, 
+                            map_obj, 
+                            palette, 
+                            img)
+                mask_info.append(metainfo)
+            continue
+        img, metainfo  = draw_img(coordinates, 
+            bounds_coords, 
+            bounds_pxls,
+            mask_type, 
+            map_obj, 
+            palette, 
+            img)
+        mask_info.append(metainfo)
     
-    cv2.imwrite(f'{SAVENAME}.bmp', img)
-    cv2.imshow(f'{SAVENAME}.bmp', img)
-    cv2.waitKey(0)
-# -----------------------------------------------------------------------------
+    x0,y0 = geocoordinates_to_pixels([w,n], bounds_coords, bounds_pxls)
+    x1,y1 = geocoordinates_to_pixels([e,s], bounds_coords, bounds_pxls)
+    aim_area = img[y0:y1, x0:x1]
+    
+    directory_path = os.path.dirname(SAVENAME)
+    name = SAVENAME.split('/')[-1]
+    mask_path = f'{directory_path}/masks'
+    source_path = f'{directory_path}/sources'
+    json_path = f'{directory_path}/jsons'
+    for dirpath in [mask_path, source_path, json_path]:
+        if not os.path.exists(dirpath):
+            os.makedirs(dirpath)
+
+    with open(f'{json_path}/{name}.json', 'w') as f:
+        json.dump(mask_info, f)
+
+    cv2.imwrite(f'{mask_path}/{name}.bmp', aim_area)
+
+    img = cv2.imread(path)
+    img = img[y0:y1, x0:x1]
+    cv2.imwrite(f'{source_path}/{name}.bmp', img)
+    # cv2.imshow(f'{SAVENAME}.bmp', aim_area)
+    # cv2.waitKey(0)
+# =============================================================================
 
 if __name__ == '__main__':
-    sam()
+    sam(SAVENAME, BOUNDS, ZOOM, tags)

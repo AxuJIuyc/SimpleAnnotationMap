@@ -4,7 +4,21 @@ import geopandas as gpd
 import pandas as pd
 import geojson
 
-def draw(map, geometry, color_line, color_fill=None, fill_opacity=0.2, info='object name'):
+
+def draw_polygon(map, geom, color, opacity, info):
+    coords = []
+    for coord in geom:
+        coords.append(coord[::-1])
+    pg = folium.Polygon(locations=coords, 
+                    color=color, 
+                    fill_color=color,
+                    fill_opacity=opacity)
+    popup = folium.Popup(info, parse_html=True)
+    popup.add_to(pg)
+    pg.add_to(map)
+
+
+def draw(map, geometry, color_line, color_fill=None, opacity=0.2, info='object name'):
     """
     geometry: feature['geometry']
     color_line: ['red'; 'blue'; 'green'; etc.] 
@@ -20,23 +34,26 @@ def draw(map, geometry, color_line, color_fill=None, fill_opacity=0.2, info='obj
         coords = []
         for lon, lat in zip(geometry.coords.xy[0], geometry.coords.xy[1]):
             coords.append((lat, lon))
-        folium.PolyLine(coords, color=color_line).add_to(map)
+        folium.PolyLine(coords, color=color_line, weight=3).add_to(map)
     elif gtype == 'Point':
         lat, lon = (geometry.y, geometry.x)
         folium.CircleMarker(location=[lat, lon], 
                             radius=6, 
                             color=color_line).add_to(map)
     elif gtype == 'Polygon':
-        coords = []
-        for coord in geometry.exterior.coords[:]:
-            coords.append(coord[::-1])
-        pg = folium.Polygon(locations=coords, 
-                       color=color_line, 
-                       fill_color=color_fill,
-                       fill_opacity=fill_opacity)
-        popup = folium.Popup(info, parse_html=True)
-        popup.add_to(pg)
-        pg.add_to(map)
+        draw_polygon(map, 
+                     geometry.exterior.coords[:], 
+                     color_line, 
+                     opacity, 
+                     info)
+
+    elif gtype == 'MultiPolygon':
+        for polygon in geometry.geoms:
+            draw_polygon(map, 
+                     polygon.exterior.coords[:], 
+                     color_line, 
+                     opacity, 
+                     info)
 
 def check_uniq_subtags(feature, tag, uniq_tags={}):
     '''
@@ -52,9 +69,10 @@ def check_uniq_subtags(feature, tag, uniq_tags={}):
     return uniq_tags
 
 def add_feature(map, feature_collection, feature, color, opacity, tag):
-    draw(map, feature['geometry'], color_line=color, fill_opacity=opacity, info=feature[tag])
+    draw(map, feature['geometry'], color_line=color, opacity=opacity, info=f"{tag}:{feature[tag]}")
     # Создайте объект GeoJSON для текущей фичи и добавьте его в FeatureCollection
     geojson_feature = geojson.Feature(geometry=feature['geometry'], properties={"color": color})
+    geojson_feature['properties']['tag'] = tag
     geojson_feature['properties']['subtag'] = feature[tag]
     feature_collection['features'].append(geojson_feature)
 
@@ -66,7 +84,6 @@ def extract_feature(map, feature_collection, feature, tags, palette, opacity=0.2
                 flag = 1
                 if feature[tag] in tags:
                     color = tags[feature[tag]]
-                    print(feature[tag], color)
                 else:
                     color = tags[tag]
                 color = palette[color]
@@ -83,16 +100,14 @@ def extract_feature(map, feature_collection, feature, tags, palette, opacity=0.2
                 print("unaccounted tag:", f"{tag}: {feature[tag]}")
 
 def main(savename, bounds, tags, opacity, 
-         zoom=15, create_mask=False, rectangle=False, simple_palette=False):
+         zoom=15, rectangle=False, simple_palette=False):
+    opacity = 0.2
     north, south, east, west = bounds
     center_lat = (north+south)/2
     center_lon = (east+west)/2
+    print("Prepare tiles...")
     # Соберите объекты определенных типов в заданной области с помощью osmnx
-    features = ox.features.features_from_bbox(north, south, east, west, 
-                                            tags={'highway': True,
-                                                  'building': True,
-                                                  'natural': True,
-                                                  'landuse': True,})
+    features = ox.features.features_from_bbox(north, south, east, west, tags)
 
     # Создайте объект FeatureCollection для хранения всех данных
     feature_collection = geojson.FeatureCollection([])
@@ -123,14 +138,15 @@ def main(savename, bounds, tags, opacity,
             'name': 'HEXp'
             }
 
-    simplep = {'red': '#ff0000', 'blue': '#0028c7', 'green': '#48cf00', 
-               'yellow': '#ffe100', 'purple': '#4e00ad', 'white': '#ffffff', 
-               'black': '#000000', 'gray': '#878787', 'cyan': '#02bd9e',
+    simplep = {'red': '#800000', 'blue': '#000080', 'green': '#008000', 
+               'yellow': '#808000', 'purple': '#800080', 'white': '#ffffff', 
+               'black': '#000000', 'gray': '#878787', 'cyan': '#008080',
                'name': 'simplep'}
 
     simpletags = {'highway': 'red', 'natural': 'green', 'landuse': 'yellow', 
                   'building': 'blue', 'bridge': 'red', 'water': 'cyan', 
-                  'bay':'cyan', 'river':'cyan',}
+                  'bay':'cyan', 'river':'cyan', 'tourism':'green', 
+                  'leisure':'green', 'cliff':'yellow'}
 
     tags = {'highway': [['crossing', 'bus_stop', 'secondary', 'residential', 
                         'service', 'unclassified', 'track', 'footway',
@@ -158,8 +174,12 @@ def main(savename, bounds, tags, opacity,
                     ['orange']]}
 
     # Добавьте выбранные объекты на карту
+    print('Add features to html')
     uniq_tags = {}
     for id, feature in features.iterrows():
+        print('==feature==')
+        print(feature)
+        print("feature['geometry']:",feature['geometry'])
         if simple_palette:
             extract_feature(m, feature_collection, feature, simpletags, simplep, opacity)
         else:
@@ -170,15 +190,15 @@ def main(savename, bounds, tags, opacity,
 
             extract_feature(m, feature_collection, feature, tags, HEXp, opacity)
 
-    print("=================================")
-    print("Tags in the area:")
-    for tags in uniq_tags.items():
-        print(tags)
-    print("=================================")
+    # print("=================================")
+    # print("Tags in the area:")
+    # for tags in uniq_tags.items():
+    #     print(tags)
+    # print("=================================")
 
-    if create_mask:
-        folium.raster_layers.ImageOverlay(image='black.jpg', 
-                                          bounds=[[0, 0], [180, 180]]).add_to(m)
+    # if create_mask:
+    #     folium.raster_layers.ImageOverlay(image='black.jpg', 
+    #                                       bounds=[[0, 0], [180, 180]]).add_to(m)
     
     if rectangle:
         folium.Rectangle(((north, west), (south, east)), color='white').add_to(m)
@@ -201,7 +221,6 @@ if __name__ == "__main__":
     # Прозрачность разметки; затемнение фона; ограничивающая рамка
     # Простая палитра
     opacity = 0.2
-    create_mask=False
     rectangle=True
     simple_palette=True
     
@@ -211,4 +230,4 @@ if __name__ == "__main__":
         'natural': True,
         'landuse': True,}
     
-    main(savename, bounds, tags, opacity, zoom, create_mask, rectangle, simple_palette)
+    main(savename, bounds, tags, opacity, zoom, rectangle, simple_palette)
