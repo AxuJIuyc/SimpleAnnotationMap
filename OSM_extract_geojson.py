@@ -177,9 +177,9 @@ def main(savename, bounds, tags, opacity,
     print('Add features to html')
     uniq_tags = {}
     for id, feature in features.iterrows():
-        print('==feature==')
-        print(feature)
-        print("feature['geometry']:",feature['geometry'])
+        # print('==feature==')
+        # print(feature)
+        # print("feature['geometry']:",feature['geometry'])
         if simple_palette:
             extract_feature(m, feature_collection, feature, simpletags, simplep, opacity)
         else:
