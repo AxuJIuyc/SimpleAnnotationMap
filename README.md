@@ -9,6 +9,8 @@ Fast start:
 At the output you will get:
 1) original image
 2) interactive html file
-3) {name}.geojson with all objects
+3) {name}.geojson with real coordinates all objects
 4) .bmp image with applied masks
+5) .json with pixel coordinates all objects
 
+Use multi_extractor for automatic saving many images
