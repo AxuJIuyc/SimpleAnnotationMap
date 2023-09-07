@@ -1,5 +1,10 @@
 # SimpleAnnotationMap
-Transfer Open Street Maps Markup to Google Maps
+Transfer Open Street Maps markup to Google Maps
+<div>
+  <img src="https://github.com/AxuJIuyc/SimpleAnnotationMap/blob/main/test/sources/test.bmp" width=500 alt="Paris" />
+  <img src="https://github.com/AxuJIuyc/SimpleAnnotationMap/blob/main/test/masks/test.bmp" width=500 alt="Paris" />
+</div>
+
 
 Fast start:
 1) Open simple_annotation_map.py
