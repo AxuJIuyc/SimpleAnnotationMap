@@ -4,13 +4,12 @@ import osmnx
 
 
 # Задайте координаты области и масштабирование
+X, Y = 14.33673, 51.58668
 ZOOM = 17
 resolution = (1024, 1024) # W,H
-
+steps = 40
 # имя файлов 
 SAVENAME = f'data/Germany/Spremberg_z{ZOOM}'
-
-
 
 # Задайте искомые тэги объектов
 tags={'highway': True,
@@ -31,11 +30,6 @@ dif = 2**ZOOM
 w, h = resolution[0]//256, resolution[1]//256
 dX, dY = w*360/dif, h*180/dif
 
-# k = 2
-# dX, dY = k*0.02, k*0.012
-X, Y = 14.33673, 51.58668
-
-steps = 40
 for i in range(1, steps):
     for j in range(0, steps):
         print(f'Tile {i}_{j} in work')
