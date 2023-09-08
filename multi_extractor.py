@@ -1,13 +1,14 @@
 from simple_annotation_map import sam
 import os
+import osmnx
 
 
 # Задайте координаты области и масштабирование
-ZOOM = 16
+ZOOM = 17
 resolution = (1024, 1024) # W,H
 
 # имя файлов 
-SAVENAME = f'data/Beijing/Beijing_z{ZOOM}'
+SAVENAME = f'data/Germany/Spremberg_z{ZOOM}'
 
 
 
@@ -16,7 +17,11 @@ tags={'highway': True,
     'building': True,
     'natural': True,
     'landuse': True,
-    'water': True}
+    'water': True,
+    'tourism': True,
+    'leisure': True,
+    'railway': True,
+    'foot': True}
 
 directory_path = os.path.dirname(SAVENAME)
 if not os.path.exists(directory_path):
@@ -28,13 +33,16 @@ dX, dY = w*360/dif, h*180/dif
 
 # k = 2
 # dX, dY = k*0.02, k*0.012
-X, Y = 116.0539, 39.9312
+X, Y = 14.33673, 51.58668
 
-steps = 11
-for i in range(10, steps):
-    for j in range(10, steps):
+steps = 40
+for i in range(1, steps):
+    for j in range(0, steps):
         print(f'Tile {i}_{j} in work')
         x0, y0 = X+dX*i, Y-dY*j
         x1, y1 = x0+dX, y0-dY
         bounds = [y0,y1,x1,x0]
-        sam(f'{SAVENAME}_{i}_{j}', bounds, ZOOM, tags)
+        try:
+            sam(f'{SAVENAME}_{i}_{j}', bounds, ZOOM, tags)
+        except osmnx._errors.InsufficientResponseError:
+            print(f'No data elements in server response for tile {i}_{j}')

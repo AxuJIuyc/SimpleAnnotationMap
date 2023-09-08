@@ -9,24 +9,22 @@ import json
 
 from downloader import main as download_map, wgs_to_tile
 from OSM_extract_geojson import main as osmextract
-
+from palette import rgb2hex, hex2rgb, hand_palette
 
 # ============================= Редактируемый блок =============================
 # Задайте координаты области и масштабирование
-BOUNDS = [39.86528203125, 39.854295703125, 116.07587265625, 116.0539] # north, south, east, west # NewYork
+BOUNDS = [49.1707, 49.1551, 2.4324, 2.4081] # north, south, east, west # NewYork
 # BOUNDS = [54.8635, 54.8443, 82.8836, 82.8359] # north, south, east, west # NSK
-ZOOM = 18
+ZOOM = 15
 
 # имя файлов 
-SAVENAME = 'data/test'
+SAVENAME = 'data/test/test'
 
 # параметры отрисовки
 rectangle=True # ограничивающая рамка (для html файла)
-simple_palette=True # Простая палитра
-# thickness = 1
-# isClosed = False
+
 blackback=True # затемнение фона
-opacity=1 # Прозрачность разметки
+opacity=255 # Прозрачность разметки
 
 # Задайте искомые тэги объектов
 tags={'highway': True,
@@ -57,18 +55,8 @@ def geocoordinates_to_pixels(coord, bounds_coords, bounds_pxls):
     
     return int(x), int(y)
 
-# Перевод палитры
-def HEX2RGB(hex_color):
-    hex_color = hex_color.lstrip('#')
-    
-    # Разбиваем HEX на отдельные составляющие R, G и B
-    b = int(hex_color[0:2], 16)
-    g = int(hex_color[2:4], 16)
-    r = int(hex_color[4:6], 16)
-    
-    return (r, g, b)
-
-def draw_mask(image, mask, color, objtype, blackback=False, opacity=0.2):
+def draw_mask(image, mask, color, objtype, opacity=255):
+    color = color[::-1]
     if objtype == 'Point':
         pass
     elif objtype == 'LineString':
@@ -83,7 +71,7 @@ def draw_mask(image, mask, color, objtype, blackback=False, opacity=0.2):
         image = create_mask2(image, mask, color, opacity)
     return image
 
-def create_mask2(image, mask, color, alpha):
+def create_mask2(image, mask, color, alpha=255):
     obj = []
     # print(mask[0])
     for x,y in mask[0]:
@@ -96,7 +84,7 @@ def create_mask2(image, mask, color, alpha):
     mask_draw = ImageDraw.Draw(mask_image)
 
     # Draw the polygon mask with the specified color and transparency
-    mask_draw.polygon(obj, fill=(color[0], color[1], color[2], 255))
+    mask_draw.polygon(obj, fill=(color[0],color[1],color[2], alpha))
 
     # Paste the mask onto the original image
     image.paste(mask_image, (0, 0), mask_image)
@@ -132,21 +120,18 @@ def create_blackback(shape):
     return np.asarray(black_image)
 
 def draw_img(polygon_coordinates, bounds_coords, bounds_pxls, 
-             mask_type, map_obj, palette, img):
+             mask_type, map_obj, img):
     pixels = [geocoordinates_to_pixels(coord, 
                                     bounds_coords, 
                                     bounds_pxls) for coord in polygon_coordinates]
-    HEXcolor = map_obj['properties']['color']
-    if HEXcolor not in palette:
-        palette[HEXcolor] = HEX2RGB(HEXcolor)
-    color = palette[HEXcolor]
-    
+ 
+    color = map_obj['properties']['color']
     metainfo = {'tag':map_obj['properties']['tag'], 
                  'subtag': map_obj['properties']['subtag'], 
                  'coords': pixels, 
                  'color': color}
     img = draw_mask(img, np.int32([pixels]), color, mask_type, 
-                blackback=blackback, opacity=opacity)
+                opacity=opacity)
     return img, metainfo
 
 # Сортировка типов для правильного порядка отрисовки:
@@ -154,7 +139,9 @@ def custom_sort_key(item):
     geometry_type = item['geometry']['type']
     tag = item['properties']['tag']
 
-    tag_order = {'landuse': 0, 'water': 1, 'building': 2, 'highway': 3, 'nature': 4}
+    tag_order = {'landuse': 0, 'water': 1, 
+                 'building': 2, 'highway': 3, 
+                 'nature': 4}
     
     if geometry_type == 'Multipolygon':
         return (0, tag_order.get(tag, 5))
@@ -166,16 +153,18 @@ def custom_sort_key(item):
 # =============================================================================
 
 def sam(SAVENAME, BOUNDS, ZOOM, tags):
+    directory_path = os.path.dirname(SAVENAME)
+    name = SAVENAME.split('/')[-1]
+    geojson_path = f'{directory_path}/geojsons'
+    
     # Загрузка аннотаций OpenStreetMaps и создание html-файла
-    if not os.path.exists(f'{SAVENAME}.geojson'):    
-        osmextract(SAVENAME, BOUNDS, tags, opacity, 
-                   ZOOM, rectangle, simple_palette)
+    if not os.path.exists(f'{geojson_path}/{name}.geojson'):
+        osmextract(SAVENAME, BOUNDS, tags, ZOOM, rectangle)
     # -------------------------------------------------------------------------
-
+    
     # Чтение аннотаций
-    with open(f'{SAVENAME}.geojson') as f:
+    with open(f'{geojson_path}/{name}.geojson') as f:
         gj = geojson.load(f)
-    # features = gj['features']
 
     # Сортировка аннотаций для корректной отрисовки
     features = []
@@ -198,8 +187,9 @@ def sam(SAVENAME, BOUNDS, ZOOM, tags):
     D_LONG = round((e-x_m), 5)
 
     nums = [lat + D_LAT, long - D_LONG, lat - D_LAT, long + D_LONG]
-    top, left, bottom, right = nums    
-    path = f'{SAVENAME}_{idx}_{lat}_{long}_{D_LAT}_{D_LONG}_{STYLE}_{ZOOM}.bmp'
+    top, left, bottom, right = nums
+    download_path = f'{directory_path}/download'    
+    path = f'{download_path}/{name}_{idx}_{lat}_{long}_{D_LAT}_{D_LONG}_{STYLE}_{ZOOM}.bmp'
     if not os.path.isfile(path):
         download_map(left, top, right, bottom, ZOOM, path, STYLE, SERVER)
     # -----------------------------------------------------------------------------
@@ -221,7 +211,6 @@ def sam(SAVENAME, BOUNDS, ZOOM, tags):
     if blackback:
         img = create_blackback(img.shape[:2])
 
-    palette = {}
     mask_info = []
     # Преобразование мировых координат объекта в пиксели
     for map_obj, _ in zip(features, tqdm(range(len(features)))):
@@ -241,7 +230,6 @@ def sam(SAVENAME, BOUNDS, ZOOM, tags):
                             bounds_pxls,
                             mask_type, 
                             map_obj, 
-                            palette, 
                             img)
                 mask_info.append(metainfo)
             continue
@@ -250,7 +238,6 @@ def sam(SAVENAME, BOUNDS, ZOOM, tags):
             bounds_pxls,
             mask_type, 
             map_obj, 
-            palette, 
             img)
         mask_info.append(metainfo)
     
@@ -258,8 +245,6 @@ def sam(SAVENAME, BOUNDS, ZOOM, tags):
     x1,y1 = geocoordinates_to_pixels([e,s], bounds_coords, bounds_pxls)
     aim_area = img[y0:y1, x0:x1]
     
-    directory_path = os.path.dirname(SAVENAME)
-    name = SAVENAME.split('/')[-1]
     mask_path = f'{directory_path}/masks'
     source_path = f'{directory_path}/sources'
     json_path = f'{directory_path}/jsons'

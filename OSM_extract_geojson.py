@@ -1,8 +1,11 @@
+import os
 import osmnx as ox
 import folium
 import geopandas as gpd
 import pandas as pd
 import geojson
+
+from palette import rgb2hex, hand_palette
 
 
 def draw_polygon(map, geom, color, opacity, info):
@@ -69,7 +72,8 @@ def check_uniq_subtags(feature, tag, uniq_tags={}):
     return uniq_tags
 
 def add_feature(map, feature_collection, feature, color, opacity, tag):
-    draw(map, feature['geometry'], color_line=color, opacity=opacity, info=f"{tag}:{feature[tag]}")
+    hexcolor = rgb2hex(color)
+    draw(map, feature['geometry'], color_line=hexcolor, opacity=opacity, info=f"{tag}:{feature[tag]}")
     # Создайте объект GeoJSON для текущей фичи и добавьте его в FeatureCollection
     geojson_feature = geojson.Feature(geometry=feature['geometry'], properties={"color": color})
     geojson_feature['properties']['tag'] = tag
@@ -79,32 +83,28 @@ def add_feature(map, feature_collection, feature, color, opacity, tag):
 def extract_feature(map, feature_collection, feature, tags, palette, opacity=0.2):
     for tag in tags:
         if tag in feature and pd.notna(feature[tag]):
-            flag = 0
-            if palette['name'] == 'simplep':
-                flag = 1
-                if feature[tag] in tags:
-                    color = tags[feature[tag]]
-                else:
-                    color = tags[tag]
-                color = palette[color]
-                add_feature(map, feature_collection, feature, color, opacity, tag)
-                continue
-            for subtag, color in zip(tags[tag][0], tags[tag][1]):
-                if subtag in feature[tag]:
-                    flag = 1
-                    color = palette[color]
-                    add_feature(map, feature_collection, feature, color, opacity)
-                    continue
-            if flag == 0: # if there is an unaccounted tag
-                add_feature(map, feature_collection, feature, palette['black'], opacity)
-                print("unaccounted tag:", f"{tag}: {feature[tag]}")
+            if feature[tag] in palette:
+                color = palette[feature[tag]]
+            else:
+                color = palette[tag]
+            add_feature(map, feature_collection, feature, color, opacity, tag)
+            continue
 
-def main(savename, bounds, tags, opacity, 
-         zoom=15, rectangle=False, simple_palette=False):
+def main(savename, bounds, tags, 
+         zoom=15, rectangle=True):
     opacity = 0.2
     north, south, east, west = bounds
     center_lat = (north+south)/2
     center_lon = (east+west)/2
+
+    directory_path = os.path.dirname(savename)
+    name = savename.split('/')[-1]
+    html_path = f'{directory_path}/html'
+    geojson_path = f'{directory_path}/geojsons'
+    for dirpath in [html_path, geojson_path]:
+        if not os.path.exists(dirpath):
+            os.makedirs(dirpath)
+
     print("Prepare tiles...")
     # Соберите объекты определенных типов в заданной области с помощью osmnx
     features = ox.features.features_from_bbox(north, south, east, west, tags)
@@ -123,91 +123,24 @@ def main(savename, bounds, tags, opacity,
     # Сохранение карты в HTML-файле с комментарием
     m.get_root().html.add_child(folium.Element(html_comment))
 
-    HEXp = {'red': '#ff0000', 'lightred': '#ff3b3b', 'darkred': '#a80000', '2darkred': '#730000',
-            'pink': '#ff7d7d', 'darkpink': '#8a4646', 'lightpink': '#ffabab',
-            'orange': '#de7f12', 'lightorange': '#ff8800', 'darkorange': '#ab5b00', 'skinny': '#ffbc70',
-            'yellow': '#ffe100', 'darkyellow': '#b09b00', 'lemon': '#ffec61', 
-            'lime': '#9dd600', 'lightlime': '#bbff00', 'darklime': '#6d9400',
-            'green': '#48cf00', 'lightgreen': '#59ff00', 'darkgreen': '#328f00',
-            'cyan': '#02bd9e', 'lightcyan': '#03ffd5', 'darkcyan': '#00705e',
-            'lightblue': '#007eb0', 'lightlightblue': '#00b7ff', 'darklightblue': '#207191',
-            'blue': '#0028c7', 'blue2': '#0028c7', 
-            'purple': '#4e00ad', 'lightpurple': '#7300ff', '2lightpurple': '#9a47ff', 'darkpurple': '#3e007d',
-            'fuchsia': '#b500af', 'lightfuchsia': '#ff00f7', 'darkfuchsia': '#6b0068',
-            'white': '#ffffff', 'black': '#000000', 'grray': '#878787',
-            'name': 'HEXp'
-            }
-
-    simplep = {'red': '#800000', 'blue': '#000080', 'green': '#008000', 
-               'yellow': '#808000', 'purple': '#800080', 'white': '#ffffff', 
-               'black': '#000000', 'gray': '#878787', 'cyan': '#008080',
-               'name': 'simplep'}
-
-    simpletags = {'highway': 'red', 'natural': 'green', 'landuse': 'yellow', 
-                  'building': 'blue', 'bridge': 'red', 'water': 'cyan', 
-                  'bay':'cyan', 'river':'cyan', 'tourism':'green', 
-                  'leisure':'green', 'cliff':'yellow'}
-
-    tags = {'highway': [['crossing', 'bus_stop', 'secondary', 'residential', 
-                        'service', 'unclassified', 'track', 'footway',
-                        'path', 'steps'],
-                        ['2darkred','white','lightred','red',
-                        'darkred','pink','darkpink','lightpink',
-                        'darkorange', 'lightpink']],
-            'natural': [['water', 'wood', 'scrub', 'tree', 
-                        'beach', 'scree', 'grassland', 'heath'],
-                        ['cyan', 'green', 'darkgreen', 'green', 
-                        'darkyellow', 'skinny', 'lightgreen', 'orange']],
-            'landuse': [['residential', 'allotments', 'farmland', 'industrial',
-                         'construction', 'grass', 'commercial', 'forest',
-                         'farmyard', 'reservoir'],
-                        ['yellow', 'lemon', 'lightorange', 'darkpurple',
-                         'darkfuchsia', 'lightgreen', 'darklightblue', 'darkgreen',
-                         'lightblue', 'lightlightblue']],
-            'building': [['yes', 'house', 'garage', 'detached',
-                          'university', 'industrial', 'office', 'service',
-                          'construction', 'residential', 'terrace', 'apartments'],
-                        ['blue','blue2','lightblue', 'lightlightblue',
-                         'purple', 'lightpurple', '2lightpurple', 'lightlightblue',
-                         'fuchsia', 'lightfuchsia', 'darkfuchsia', 'darkpurple']],
-            'bridge': [['yes'],
-                    ['orange']]}
-
     # Добавьте выбранные объекты на карту
     print('Add features to html')
     uniq_tags = {}
+    palette = hand_palette()
     for id, feature in features.iterrows():
         # print('==feature==')
         # print(feature)
         # print("feature['geometry']:",feature['geometry'])
-        if simple_palette:
-            extract_feature(m, feature_collection, feature, simpletags, simplep, opacity)
-        else:
-            uniq_tags = check_uniq_subtags(feature, 'landuse', uniq_tags)
-            uniq_tags = check_uniq_subtags(feature, 'highway', uniq_tags)
-            uniq_tags = check_uniq_subtags(feature, 'natural', uniq_tags)
-            uniq_tags = check_uniq_subtags(feature, 'building', uniq_tags)
-
-            extract_feature(m, feature_collection, feature, tags, HEXp, opacity)
-
-    # print("=================================")
-    # print("Tags in the area:")
-    # for tags in uniq_tags.items():
-    #     print(tags)
-    # print("=================================")
-
-    # if create_mask:
-    #     folium.raster_layers.ImageOverlay(image='black.jpg', 
-    #                                       bounds=[[0, 0], [180, 180]]).add_to(m)
-    
+        extract_feature(m, feature_collection, feature, tags, palette, opacity)
+  
     if rectangle:
         folium.Rectangle(((north, west), (south, east)), color='white').add_to(m)
-
+    
     # Сохраните карту в HTML-файл
-    m.save(f'{savename}_op{opacity}.html')
+    m.save(f'{html_path}/{name}_op{opacity}.html')
 
     # Создайте GeoJSON-файл
-    with open(f'{savename}.geojson', 'w') as f:
+    with open(f'{geojson_path}/{name}.geojson', 'w') as f:
         geojson.dump(feature_collection, f)
 
 if __name__ == "__main__":
@@ -222,7 +155,6 @@ if __name__ == "__main__":
     # Простая палитра
     opacity = 0.2
     rectangle=True
-    simple_palette=True
     
     # Задайте искомые тэги объектов
     tags={'highway': True,
@@ -230,4 +162,4 @@ if __name__ == "__main__":
         'natural': True,
         'landuse': True,}
     
-    main(savename, bounds, tags, opacity, zoom, rectangle, simple_palette)
+    main(savename, bounds, tags, zoom, rectangle)
