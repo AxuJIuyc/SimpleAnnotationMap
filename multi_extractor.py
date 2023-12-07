@@ -3,7 +3,7 @@ import os
 import osmnx
 
 
-# Задайте координаты области и масштабирование
+# Set area coordinates and scaling
 X, Y = 14.33673, 51.58668
 ZOOM = 17
 resolution = (1024, 1024) # W,H
@@ -11,7 +11,7 @@ steps = 40
 # имя файлов 
 SAVENAME = f'data/Germany/Spremberg_z{ZOOM}'
 
-# Задайте искомые тэги объектов
+# Specify the required object tags
 tags={'highway': True,
     'building': True,
     'natural': True,
