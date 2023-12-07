@@ -11,22 +11,22 @@ from downloader import main as download_map, wgs_to_tile
 from OSM_extract_geojson import main as osmextract
 from palette import rgb2hex, hex2rgb, hand_palette
 
-# ============================= Редактируемый блок =============================
-# Задайте координаты области и масштабирование
+# ============================= Editable block =============================
+# Set area coordinates and scaling
 BOUNDS = [49.1707, 49.1551, 2.4324, 2.4081] # north, south, east, west # NewYork
 # BOUNDS = [54.8635, 54.8443, 82.8836, 82.8359] # north, south, east, west # NSK
 ZOOM = 15
 
-# имя файлов 
+# file name
 SAVENAME = 'data/test/test'
 
-# параметры отрисовки
-rectangle=True # ограничивающая рамка (для html файла)
+# drawing parameters
+rectangle=True # bounding box (for html file)
 
-blackback=True # затемнение фона
-opacity=255 # Прозрачность разметки
+blackback=True # darkening the background
+opacity=255 # Markup transparency
 
-# Задайте искомые тэги объектов
+# Specify the required object tags
 tags={'highway': True,
     'building': True,
     'natural': True,
@@ -36,7 +36,7 @@ tags={'highway': True,
     'leisure': True}
 # ==============================================================================
 
-# ======================== Блок исполнительных функций ========================
+# ======================== Executive functions block========================
 # Позиция тайла в мировые координаты
 def tile_to_lat_lon(tile_x, tile_y, zoom):
     n = 2.0 ** zoom
@@ -110,8 +110,6 @@ def create_mask(image, mask, color, alpha):
     return out
 
 def create_blackback(shape):
-    from PIL import Image
-
     # Задайте размеры изображения (x, y)
     y, x = shape
     # Создайте черное изображение
