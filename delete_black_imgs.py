@@ -2,25 +2,23 @@ import cv2
 import os
 from tqdm import tqdm
 
-# Путь к директории с изображениями
+# Path to the directory with images
 folder_path = 'data/Germany'
 
-# Пороговое значение для определения черного цвета
-black_threshold = 30  # Процент площади черного цвета
+# Threshold value for black color detection
+black_threshold = 30  # Area percentage black
 
-# Функция для определения процента черного цвета на изображении
 def calculate_black_percentage(image_path):
     image = cv2.imread(image_path)
     if image is None:
-        return 0  # Изображение не удалось загрузить
+        return 0  # Image failed to load
 
-    # Преобразование в оттенки серого
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # Вычисление порогового значения для черного цвета
+    # Calculating the Black color Threshold
     _, black_and_white_image = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY)
     
-    # Вычисление процента черного цвета
+    # Calculating percent black
     total_pixels = black_and_white_image.size
     white_pixels = cv2.countNonZero(black_and_white_image)
     percentage_black = 100 - (white_pixels / total_pixels) * 100
@@ -35,14 +33,13 @@ def run(folder_path, black_threshold):
     geojson_path = f'{folder_path}/geojson'
     json_path = f'{folder_path}/jsons'
 
-    # Пройти по всем файлам в директории и удалить те, на которых черного цвета больше 20%
+    # Go through all the files in the directory and delete those with more than {black_threshold}% black
     deleted_list = []
     files = os.listdir(masks_path)
     for filename, _ in zip(files, tqdm(range(len(files)))):
         name = os.path.splitext(filename)[0]
         image_path = os.path.join(masks_path, filename)
         
-        # Проверить, является ли файл изображением
         if os.path.isfile(image_path) and image_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
             black_percentage = calculate_black_percentage(image_path)
             
@@ -66,7 +63,7 @@ def run(folder_path, black_threshold):
                 if os.path.exists(download_file):
                     os.remove(download_file)
 
-    print(f'Было удалено {len(deleted_list)} изображений:')
+    print(f'{len(deleted_list)} images have been deleted:')
     print(deleted_list)
 
 if __name__ == '__main__':
