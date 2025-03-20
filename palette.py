@@ -1,16 +1,59 @@
-# ============================= Palettes =======================================
-def hand_palette():
-    palette = {
-        'highway':[128,0,0],    'natural':[0,128,0],        'landuse':[128,128,0],
-        'building':[0,0,128],   'bridge':[128,0,0],         'water':[0,128,128],
-        'wood':[0,128,0],       'beach':[128,128,0],        'grassland':[128,128,0],
-        'forest':[0,128,0],     'golf_course':[128,128,0],  'cliff':[128,128,0],
-        'leisure':[0,128,0],    'wetland':[0,128,128],      'bay':[0,128,128],
-        'river':[0,128,128],    'tourism':[0,128,128],      'railway':[128,0,0], 
-        'foot':[128,0,0]
-    } 
-    return palette
+import pandas as pd
 
+
+# ============================= Palettes =======================================
+hand_palette = {
+    'highway': {
+        'color': [128, 0, 0],
+        'geom_types': ['LineString'],
+        'positive_subtags': [],
+        'negative_subtags': ['footway', 'steps'],
+        'avg_width': 3.25
+    },
+    'building': {
+        'color': [0, 0, 128],
+        'geom_types': ['Polygon'],
+        'positive_subtags': [],
+        'negative_subtags': []
+    },
+    'natural': {
+        'color': [0, 128, 0],
+        'geom_types': ['Polygon', 'MultiPolygon'],
+        'positive_subtags': [],
+        'negative_subtags': ['water']
+    },
+    'landuse': {
+        'color': [128, 128, 0],
+        'geom_types': ['Polygon', 'MultiPolygon'],
+        'positive_subtags': [],
+        'negative_subtags': []
+    },
+    'leisure': {
+        'color': [0, 128, 0],
+        'geom_types': ['Polygon', 'MultiPolygon'],
+        'positive_subtags': ['park'],
+        'negative_subtags': []
+    },
+    'shop': {
+        'color': [0, 0, 128],
+        'geom_types': ['Polygon', 'MultiPolygon'],
+        'positive_subtags': ['park'],
+        'negative_subtags': []
+    },
+    'water': {
+        'color': [0, 128, 128],
+        'geom_types': ['Polygon', 'MultiPolygon'],
+        'positive_subtags': [],
+        'negative_subtags': []
+    },
+    'footway': {
+        'color': [255, 0, 0],
+        'geom_types': ['LineString', 'Polygon', 'MultiPolygon'],
+        'positive_subtags': ['sidewalk'],
+        'negative_subtags': [],
+        'avg_width': 2
+    },
+}
 
 
 # =============================================================================
@@ -30,3 +73,57 @@ def hex2rgb(hex_color):
     r = int(hex_color[4:6], 16)
     
     return (r, g, b)
+
+
+scale_table = pd.DataFrame(
+    [
+        [1,                     360,    156_543, "1:500*1e6",   "whole world"],
+        [4,                     180,    78_272, "1:250*1e6",    ""],
+        [16,                    90,     39_136, "1:150*1e6",    "subcontinental area"],
+        [64,                    45,     19_568, "1:70*1e6",     "largest country"],
+        [256,                   22.5,   9784,   "1:35*1e6",     ""],
+        [1024,                  11.25,  4892,   "1:15*1e6",     "large African country"],
+        [4096,                  5.625,  2446,   "1:10*1e6",     "large European country"],
+        [16_384,                2.813,  1223,   "1:4*1e6",      "small country, US state"],
+        [65_536,                1.406,  611.496, "1:2*1e6",     ""],
+        [262_144,               0.703,  305.748, "1:1*1e6",     "wide area, large metropolitan area"],
+        [1_048_576,             0.352,  152.874, "1:500*1e3",   "metropolitan area"],
+        [4_194_304,             0.176,  76.437, "1:250*1e3",    "city"],
+        [16_777_216,            0.088,  38.219, "1:150*1e3",    "town or city district"],
+        [67_108_864,            0.044,  19.109, "1:70*1e3",     "village, or suburb"],
+        [268_435_456,           0.022,  9.555,  "1:35*1e3",     ""],
+        [1_073_741_824,         0.011,  4.777,  "1:15*1e3",     "small road"],
+        [4_294_967_296,         0.005,  2.389,  "1:8*1e3",      "street"],
+        [17_179_869_184,        0.003,  1.194,  "1:4*1e3",      "block, park, addresses"],
+        [68_719_476_736,        0.001,  0.597,  "1:2*1e3",      "some buildings, trees"],
+        [274_877_906_944,       0.0005, 0.299,  "1:1*1e3",      "local highway and crossing details"],
+        [1_099_511_627_776,     0.00025, 0.149, "1:5*1e2",      "A mid0sized builing"],
+    ], 
+    columns=[
+        "Tiles", 
+        "Tile width", # (degrees of longitudes) 
+        "m/pixel", # (on Equator) 
+        "Scale", # (on screen) 
+        "Examples" # Examples of areas to represent
+    ]
+).rename_axis("Level", axis=0)
+    
+def scale(zoom, arlw=3.25, lanes=0, width=0):
+    """_summary_
+
+    Args:
+        zoom (_type_): _description_
+        arlw (float, optional): avg_roadlane_width, meters. Defaults to 3.25.
+        lanes (int, optional): _description_. Defaults to 0.
+        width (int, optional): _description_. Defaults to 0.
+
+    Returns:
+        _type_: _description_
+    """
+    mp = scale_table.loc[zoom]['m/pixel']
+    if width:
+        p = width / mp
+    elif lanes:
+        width = arlw * lanes
+        p = width / mp
+    return p

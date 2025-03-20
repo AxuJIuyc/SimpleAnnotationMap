@@ -55,17 +55,18 @@ def geocoordinates_to_pixels(coord, bounds_coords, bounds_pxls):
     
     return int(x), int(y)
 
-def draw_mask(image, mask, color, objtype, opacity=255):
+def draw_mask(image, mask, color, objtype, opacity=255, line_thickness=3):
     color = color[::-1]
     if objtype == 'Point':
         pass
     elif objtype == 'LineString':
         isClosed = False
+        image = np.array(image)
         cv2.polylines(image, 
                     mask, 
                     isClosed,  
                     color,
-                    thickness=3)
+                    thickness=line_thickness)
     elif objtype == 'Polygon':
         image = Image.fromarray(image)
         image = create_mask2(image, mask, color, opacity)
@@ -118,7 +119,7 @@ def create_blackback(shape):
     return np.asarray(black_image)
 
 def draw_img(polygon_coordinates, bounds_coords, bounds_pxls, 
-             mask_type, map_obj, img):
+             mask_type, map_obj, img, line_thickness=3):
     pixels = [geocoordinates_to_pixels(coord, 
                                     bounds_coords, 
                                     bounds_pxls) for coord in polygon_coordinates]
@@ -129,7 +130,7 @@ def draw_img(polygon_coordinates, bounds_coords, bounds_pxls,
                  'coords': pixels, 
                  'color': color}
     img = draw_mask(img, np.int32([pixels]), color, mask_type, 
-                opacity=opacity)
+                opacity=opacity, line_thickness=line_thickness)
     return img, metainfo
 
 # Сортировка типов для правильного порядка отрисовки:
