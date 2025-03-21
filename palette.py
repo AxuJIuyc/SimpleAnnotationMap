@@ -3,55 +3,86 @@ import pandas as pd
 
 # ============================= Palettes =======================================
 hand_palette = {
-    'highway': {
-        'color': [128, 0, 0],
-        'geom_types': ['LineString'],
-        'positive_subtags': [],
-        'negative_subtags': ['footway', 'steps'],
-        'avg_width': 3.25
-    },
-    'building': {
-        'color': [0, 0, 128],
-        'geom_types': ['Polygon'],
-        'positive_subtags': [],
-        'negative_subtags': []
-    },
-    'natural': {
-        'color': [0, 128, 0],
-        'geom_types': ['Polygon', 'MultiPolygon'],
-        'positive_subtags': [],
-        'negative_subtags': ['water']
-    },
     'landuse': {
         'color': [128, 128, 0],
         'geom_types': ['Polygon', 'MultiPolygon'],
         'positive_subtags': [],
-        'negative_subtags': []
-    },
-    'leisure': {
-        'color': [0, 128, 0],
-        'geom_types': ['Polygon', 'MultiPolygon'],
-        'positive_subtags': ['park'],
-        'negative_subtags': []
-    },
-    'shop': {
-        'color': [0, 0, 128],
-        'geom_types': ['Polygon', 'MultiPolygon'],
-        'positive_subtags': ['park'],
-        'negative_subtags': []
+        'negative_subtags': [],
+        'draw_level': 1
     },
     'water': {
         'color': [0, 128, 128],
         'geom_types': ['Polygon', 'MultiPolygon'],
         'positive_subtags': [],
-        'negative_subtags': []
+        'negative_subtags': [],
+        'draw_level': 0
+    },
+    'highway': {
+        'color': [128, 0, 0],
+        'geom_types': ['LineString'],
+        'positive_subtags': [],
+        'negative_subtags': ['footway', 'steps'],
+        'avg_width': 3.25,
+        'draw_level': 2
     },
     'footway': {
         'color': [255, 0, 0],
         'geom_types': ['LineString', 'Polygon', 'MultiPolygon'],
         'positive_subtags': ['sidewalk'],
         'negative_subtags': [],
-        'avg_width': 2
+        'avg_width': 2,
+        'draw_level': 2
+    },
+    'sport': {
+        'color': [128, 0, 0],
+        'geom_types': ['Polygon', 'MultiPolygon'],
+        'positive_subtags': ['running'],
+        'negative_subtags': [],
+        'draw_level': 2
+    },
+    'railway': {
+        'color': [128, 0, 128],
+        'geom_types': ['LineString'],
+        'positive_subtags': ['rail'],
+        'negative_subtags': ['constraction'],
+        'avg_width': 2.5,
+        'draw_level': 3
+    },
+    'building': {
+        'color': [0, 0, 128],
+        'geom_types': ['Polygon'],
+        'positive_subtags': [],
+        'negative_subtags': [],
+        'draw_level': 4
+    },
+    'shop': {
+        'color': [0, 0, 128],
+        'geom_types': ['Polygon', 'MultiPolygon'],
+        'positive_subtags': ['park'],
+        'negative_subtags': [],
+        'draw_level': 4
+    },
+    'constraction': {
+        'color': [0, 0, 0],
+        'geom_types': ['LineString'],
+        'positive_subtags': [],
+        'negative_subtags': ['subway'],
+        'avg_width': 1.5,
+        'draw_level': 4
+    },
+    'natural': {
+        'color': [0, 128, 0],
+        'geom_types': ['Polygon', 'MultiPolygon'],
+        'positive_subtags': [],
+        'negative_subtags': ['water'],
+        'draw_level': 5
+    },
+    'leisure': {
+        'color': [0, 128, 0],
+        'geom_types': ['Polygon', 'MultiPolygon'],
+        'positive_subtags': ['park'],
+        'negative_subtags': [],
+        'draw_level': 5
     },
 }
 
