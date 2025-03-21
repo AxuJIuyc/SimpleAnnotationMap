@@ -1,19 +1,19 @@
 # SimpleAnnotationMap
 Transfer Open Street Maps markup to Google Maps
 <div>
-  <img src="https://github.com/AxuJIuyc/SimpleAnnotationMap/data/sources/paris.bmp" width=500 alt="Paris" />
-  <img src="https://github.com/AxuJIuyc/SimpleAnnotationMap/data/masks/paris.bmp" width=500 alt="Paris" />
+  <img src="./data/paris/sources/paris.bmp" width=500 alt="Paris" />
+  <img src="./data/paris/masks/paris.bmp" width=500 alt="Paris" />
 </div>
 
 
-Install:
+## Install:
 ``` bash
 git clone https://github.com/AxuJIuyc/SimpleAnnotationMap.git
 cd SimpleAnnotationMap
 pip install requirements.txt
 ```
 
-Fast start:
+## Fast start:
 1) Open runsam.py
 2) Change the BOUNDS coordinates of the desired location from OpenStreetMaps
 3) Run 
