@@ -1,5 +1,7 @@
 # Наложить аннотации на PNG
 import os
+
+# from pyparsing import col
 from downloader import main as download_map, wgs_to_tile
 import cv2
 from tqdm import tqdm
@@ -10,25 +12,9 @@ import numpy as np
 from PIL import Image, ImageDraw
 import geojson
 
+from drawing import draw_masks, create_background
+from geoscale import tile_to_lat_lon, world2pixels
 
-# Нормировка объектов к изображению
-def geocoordinates_to_pixels(coord, bounds_coords, bounds_pxls):
-    min_lon, min_lat, max_lon, max_lat = bounds_coords
-    min_x, min_y, max_x, max_y = bounds_pxls
-    
-    x = (coord[0] - min_lon) / (max_lon - min_lon) * (max_x - min_x) + min_x
-    y = (coord[1] - min_lat) / (max_lat - min_lat) * (max_y - min_y) + min_y
-    
-    return int(x), int(y)
-
-
-# Позиция тайла в мировые координаты
-def tile_to_lat_lon(tile_x, tile_y, zoom):
-    n = 2.0 ** zoom
-    lon_deg = tile_x / n * 360.0 - 180.0
-    lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * tile_y / n)))
-    lat_deg = math.degrees(lat_rad)
-    return lat_deg, lon_deg
 
 # Сортировка типов для правильного порядка отрисовки:
 def custom_sort_key(item):
@@ -41,154 +27,6 @@ def custom_sort_key(item):
         return (1, hand_palette[tag].get('draw_level', 100))
     else:
         return (2, hand_palette[tag].get('draw_level', 100))
-
-def world2pixels(bounds, bounds_coords, bounds_pxls):
-    """
-        Преобразование мировых координат объекта в пиксели
-    """
-    n, s, e, w = bounds
-    x0,y0 = geocoordinates_to_pixels([w,n], bounds_coords, bounds_pxls)
-    x1,y1 = geocoordinates_to_pixels([e,s], bounds_coords, bounds_pxls)
-    return x0, y0, x1, y1
-
-def draw_img(polygon_coordinates, bounds_coords, bounds_pxls, 
-             mask_type, map_obj, img, line_thickness=3, opacity=1):
-    pixels = [geocoordinates_to_pixels(coord, 
-                                    bounds_coords, 
-                                    bounds_pxls) for coord in polygon_coordinates]
- 
-    color = map_obj['properties']['color']
-    metainfo = {
-        'tag':map_obj['properties']['tag'], 
-        'subtag': map_obj['properties']['subtag'], 
-        'coords': pixels, 
-        'color': color
-        }
-    opacity = int(opacity*255)
-    img = draw_mask(img, np.int32([pixels]), color, mask_type, 
-                opacity=opacity, line_thickness=line_thickness)
-    return img, metainfo
-
-def create_mask(image, mask, color, alpha=255):
-    obj = []
-    # print(mask[0])
-    for x,y in mask[0]:
-        obj.append((x,y))
-
-    # Create a new Image with the same size as the original image
-    mask_image = Image.new("RGBA", image.size)
-
-    # Create an ImageDraw object for the mask
-    mask_draw = ImageDraw.Draw(mask_image)
-
-    # Draw the polygon mask with the specified color and transparency
-    mask_draw.polygon(obj, fill=(color[0],color[1],color[2], alpha))
-
-    # Paste the mask onto the original image
-    image.paste(mask_image, (0, 0), mask_image)
-
-    # Optionally, display the result
-    # image.show()
-
-    return np.array(image)
-
-def draw_mask(image, mask, color, objtype, opacity=255, line_thickness=3):
-    color = color[::-1]
-    if objtype == 'Point':
-        pass
-    elif objtype == 'LineString':
-        isClosed = False
-        image = np.array(image)
-        cv2.polylines(image, 
-                    mask, 
-                    isClosed,  
-                    color,
-                    thickness=line_thickness)
-    elif objtype == 'Polygon':
-        # image = Image.fromarray(image)
-        image = np.array(image)
-        cv2.fillPoly(image, [mask], color=color)
-        cv2.addWeighted(image, opacity / 255.0, image, 1 - (opacity / 255.0), 0, image)
-    return image
-    
-def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show=False):
-    if show:
-        cv2.namedWindow("mask", cv2.WINDOW_NORMAL)
-        cv2.resizeWindow("mask", 1024, 640)
-
-    mask_info = []
-    tags_dict = {}  # Словарь для хранения объектов, сгруппированных по тегам
-
-    # Группируем объекты по тегам
-    for map_obj in tqdm(features):
-        mask_type = map_obj['geometry']['type']
-        if mask_type == 'Point':
-            continue  # Пропускаем точки
-
-        coordinates = map_obj['geometry']['coordinates']
-        if mask_type == 'Polygon':
-            coordinates = [coordinates[0]]  # Оборачиваем в список для единообразия
-        elif mask_type == 'MultiPolygon':
-            coordinates = [poly[0] for poly in coordinates]  # Берём первые кольца каждого полигона
-
-        line_thickness = 3
-        if mask_type == 'LineString':
-            width = map_obj['properties'].get('width', None)
-            lanes = map_obj['properties'].get('lanes', None)
-            tag = map_obj['properties']['tag']
-            rlw = hand_palette[tag]['avg_width']
-            if width:
-                line_thickness = int(scale(zoom, width=float(width)))
-            elif lanes:
-                line_thickness = int(scale(zoom, arlw=float(rlw), lanes=int(lanes)))
-
-        color = tuple(reversed(map_obj['properties']['color']))  # Преобразуем в BGR
-        alpha = int(opacity * 255)  # Преобразуем прозрачность
-
-        # Заполняем словарь по тегам
-        tag = map_obj['properties']['tag']
-        if tag not in tags_dict:
-            tags_dict[tag] = {'polygons': [], 'polylines': [], 'line_thicknesses': [], 'colors': []}
-        
-        # Добавляем в соответствующую группу (полигон или линия)
-        if mask_type in ['Polygon', 'MultiPolygon']:
-            for poly_coords in coordinates:
-                pixels = np.array([geocoordinates_to_pixels(coord, bounds_coords, bounds_pxls) 
-                                   for coord in poly_coords], dtype=np.int32)
-                if len(pixels) > 0:
-                    tags_dict[tag]['polygons'].append(pixels)
-                    tags_dict[tag]['colors'].append((*color, alpha))  # Добавляем альфа-канал
-
-        elif mask_type == 'LineString':
-            pixels = np.array([geocoordinates_to_pixels(coord, bounds_coords, bounds_pxls) 
-                               for coord in coordinates], dtype=np.int32)
-            if len(pixels) > 1:  # Линия должна состоять как минимум из двух точек
-                tags_dict[tag]['polylines'].append(pixels)
-                tags_dict[tag]['line_thicknesses'].append(line_thickness)
-                tags_dict[tag]['colors'].append(color)
-
-        mask_info.append({'tag': map_obj['properties']['tag'], 
-                          'subtag': map_obj['properties']['subtag'], 
-                          'coords': pixels.tolist(), 
-                          'color': color})
-
-    mask = np.array(mask)
-    # Отрисовываем полигоны и линии в порядке тегов
-    for tag, group in tags_dict.items():
-        # Сначала отрисовываем полигоны для этого тега
-        for polygon, color in zip(group['polygons'], group['colors']):
-            mask = cv2.fillPoly(mask, [polygon], color)
-        
-        # Затем отрисовываем линии для этого тега
-        for polyline, color, thickness in zip(group['polylines'], group['colors'], group['line_thicknesses']):
-            mask = cv2.polylines(mask, [polyline], isClosed=False, color=color, thickness=thickness)
-
-    if show:
-        cv2.imshow('mask', mask)
-        cv2.waitKey(0)
-
-    cv2.destroyAllWindows()
-    return mask, mask_info
   
 def def_aim_area(bounds):
     """
@@ -245,22 +83,7 @@ def geojson_sort(gj, criterion=custom_sort_key):
     features = sorted(features, key=criterion) ##############
     return features
 
-def create_background(shape, color):
-    """_summary_
 
-    Args:
-        shape (_type_): (y, x) - shape of image
-        color (_type_): (R,G,B) from 0 to 255
-
-    Returns:
-        _type_: _description_
-    """
-    # Задайте размеры изображения (x, y)
-    y, x = shape
-    # Создайте изображение
-    image = Image.new('RGB', (x, y), color)
-
-    return np.asarray(image)[:,:,::-1]
 
 # ++++++++++++++++++++++++++++++++++++
 def create_mapmask(

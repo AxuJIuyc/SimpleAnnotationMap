@@ -7,17 +7,17 @@ Transfer Open Street Maps markup to Google Maps
 
 
 ## Install:
-``` bash
+```bash
 git clone https://github.com/AxuJIuyc/SimpleAnnotationMap.git
 cd SimpleAnnotationMap
-pip install requirements.txt
+pip install -r requirements.txt
 ```
 
 ## Fast start:
 1) Open runsam.py
 2) Change the BOUNDS coordinates of the desired location from OpenStreetMaps
 3) Run 
-``` bash
+```bash
 python runsam.py
 ```
 
