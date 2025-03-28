@@ -1,4 +1,5 @@
 import math
+import numpy as np
 
 
 # Нормировка объектов к изображению
@@ -28,3 +29,13 @@ def world2pixels(bounds, bounds_coords, bounds_pxls):
     x1,y1 = geocoordinates_to_pixels([e,s], bounds_coords, bounds_pxls)
     return x0, y0, x1, y1
 
+
+# Функция преобразования координат в пиксели
+def wgs84_to_pixels(coords, img_size, bbox):
+    min_x, min_y, max_x, max_y = bbox
+    scale_x = img_size[1] / (max_x - min_x)
+    scale_y = img_size[0] / (max_y - min_y)
+    return np.array([[
+        int((x - min_x) * scale_x),
+        int((max_y - y) * scale_y)  # Инверсия Y для OpenCV
+    ] for x, y in coords], dtype=np.int32)

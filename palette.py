@@ -23,7 +23,10 @@ hand_palette = {
         'positive_subtags': [],
         'negative_subtags': ['footway', 'steps'],
         'avg_width': 3.25,
-        'draw_level': 2
+        'draw_level': 2,
+        'object_detection': {
+            'crossing': {'draw':True, 'color':(255,255,255), 'thickness':4},
+        },        
     },
     'footway': {
         'color': [255, 0, 0],
@@ -31,7 +34,10 @@ hand_palette = {
         'positive_subtags': ['sidewalk'],
         'negative_subtags': [],
         'avg_width': 2,
-        'draw_level': 2
+        'draw_level': 2,
+        'object_detection': {
+            'crossing': {'draw':True, 'color':(255,255,255), 'thickness':4},
+        }
     },
     'sport': {
         'color': [128, 0, 0],
@@ -53,14 +59,22 @@ hand_palette = {
         'geom_types': ['Polygon'],
         'positive_subtags': [],
         'negative_subtags': [],
-        'draw_level': 4
+        'draw_level': 4,
+        'object_detection': {
+            'bbox': {'draw':True, 'color':(255,255,255), 'thickness':4},
+            'corner': {'draw':True, 'color':(100,100,100), 'thickness':2}            
+        }
     },
     'shop': {
         'color': [0, 0, 128],
         'geom_types': ['Polygon', 'MultiPolygon'],
         'positive_subtags': ['park'],
         'negative_subtags': [],
-        'draw_level': 4
+        'draw_level': 4,
+        'object_detection': {
+            'bbox': {'draw':True, 'color':(255,255,255), 'thickness':4},
+            'corner': {'draw':True, 'color':(100,100,100), 'thickness':2}            
+        }
     },
     'constraction': {
         'color': [0, 0, 0],

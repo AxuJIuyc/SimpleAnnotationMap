@@ -1,10 +1,12 @@
+
 import cv2
 from PIL import Image, ImageDraw
+
 from tqdm import tqdm
 from palette import hand_palette, scale
 import numpy as np
-from geoscale import geocoordinates_to_pixels
-
+from geoscale import geocoordinates_to_pixels, wgs84_to_pixels
+import pandas as pd
 
 
 def create_mask(image, mask, color, alpha=255):
@@ -76,6 +78,7 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
 
     mask_info = []
     tags_dict = {}  # Словарь для хранения объектов, сгруппированных по тегам
+    objects = [] # Для детекции объектов
 
     # Группируем объекты по тегам
     for map_obj in tqdm(features):
@@ -126,6 +129,9 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
                 pixels = [outer_contour, inner_contours]
                 tags_dict[tag]['multipolygons'].append(pixels)
                 tags_dict[tag]['colors'].append((*color, alpha))  # Добавляем альфа-канал
+                
+                if hand_palette[tag].get('object_detection'):
+                    objects.append({"tag": tag, "object": outer_contour, "mask_type": 'Polygon'})
 
             else:
                 poly_coords = coordinates[0]
@@ -133,6 +139,9 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
                                     for coord in poly_coords], dtype=np.int32)
                 tags_dict[tag]['polygons'].append(pixels)
                 tags_dict[tag]['colors'].append((*color, alpha))  # Добавляем альфа-канал
+                
+                if hand_palette[tag].get('object_detection'):
+                    objects.append({"tag": tag, "object": poly_coords, "mask_type": 'Polygon'})
 
         elif mask_type == 'LineString':
             pixels = np.array([geocoordinates_to_pixels(coord, bounds_coords, bounds_pxls) 
@@ -148,6 +157,9 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
             tags_dict[tag]['polylines'].append(pixels)
             tags_dict[tag]['line_thicknesses'].append(line_thickness)
             tags_dict[tag]['colors'].append(color)
+            
+            if hand_palette[tag].get('object_detection'):
+                    objects.append({"tag": tag, "object": coordinates, "mask_type": mask_type})            
 
         else:
             print('other')
@@ -172,8 +184,9 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
         for polyline, color, thickness in zip(group['polylines'], group['colors'], group['line_thicknesses']):
             mask = cv2.polylines(mask, [polyline], isClosed=False, color=color, thickness=int(thickness))
 
-    # for mp in multipoligons:
-    #     draw_filled_multipolygon(mask, mp, bounds_coords, bounds_pxls)
+    h,w,c = mask.shape
+    objects = get_objects(objects, (w,h), bounds_coords, bounds_pxls)
+    draw_objects(mask, objects)
 
     if show:
         cv2.imshow('mask', mask)
@@ -216,3 +229,116 @@ def create_background(shape, color):
     image = Image.new('RGB', (x, y), color)
 
     return np.asarray(image)[:,:,::-1]
+
+
+def get_bbox(polygon, img_size):
+    # Получаем границы (Bounding Box)
+    min_x, min_y, max_x, max_y = polygon.bounds
+
+    # Конвертируем границы в пиксели
+    bbox_pixels = wgs84_to_pixels(
+        [(min_x, min_y), (max_x, max_y)], 
+        img_size, 
+        (min_x, min_y, max_x, max_y)
+    )
+    return bbox_pixels
+
+def draw_bbox(image, bbox_pixels, color=(255,0,0), thickness=2):
+    (x_min_pix, y_max_pix), (x_max_pix, y_min_pix) = bbox_pixels  # OpenCV (0,0) — верхний левый угол
+    # Рисуем Bounding Box
+    cv2.rectangle(image, (x_min_pix, y_min_pix), (x_max_pix, y_max_pix), color, thickness)  # Жёлтая рамка
+    return image
+
+def angle_between_vectors(v1, v2):
+    dot_product = np.dot(v1, v2)
+    norm_v1 = np.linalg.norm(v1)
+    norm_v2 = np.linalg.norm(v2)
+    angle = np.arccos(dot_product / (norm_v1 * norm_v2))  # Радианы
+    return np.degrees(angle)  # Переводим в градусы
+
+def find_corners(polygon, bounds_coords, bounds_pxls):
+    # Найдём углы узлов внешнего контура
+    polygon_coords = list(polygon.coords)
+    angles = []
+
+    for i in range(len(polygon_coords)):
+        p0 = np.array(polygon_coords[i - 1])  # Предыдущий узел
+        p1 = np.array(polygon_coords[i])      # Текущий узел
+        p2 = np.array(polygon_coords[(i + 1) % len(polygon_coords)])  # Следующий узел
+
+        v1 = p1 - p0  # Вектор предыдущий->текущий
+        v2 = p2 - p1  # Вектор текущий->следующий
+
+        angle = angle_between_vectors(v1, v2)
+        if 30 <= angle <= 150:
+            angles.append((tuple(p1), angle))
+    return [geocoordinates_to_pixels(angle, bounds_coords, bounds_pxls) for angle in angles]
+
+def find_crossroads(roads, img_size, bounds_pxls):
+    # Список дорог
+    # roads = [road_1, road_2, road_3]
+    min_x, min_y, max_x, max_y = bounds_pxls
+
+    # Найдём все пересечения
+    intersection_points = []
+
+    for i in range(len(roads)):
+        for j in range(i + 1, len(roads)):
+            intersection = roads[i].intersection(roads[j])
+            if intersection.is_empty:
+                continue  # Нет пересечения
+            if intersection.geom_type == "Point":
+                intersection_points.append(intersection)
+
+    # Конвертируем в пиксели
+    intersection_pixels = [wgs84_to_pixels([point.coords[0]], img_size, (min_x, min_y, max_x, max_y))[0]
+                        for point in intersection_points]
+
+    return intersection_pixels
+
+def draw_points(image, intersection_pixels, color=None, rad=5, thickness=-1):
+    # Отрисовка точек перекрёстков
+    for pt in intersection_pixels:
+        cv2.circle(image, tuple(pt), rad, color, thickness)  # Жёлтые точки
+    return image
+
+def get_objects(objects, img_size, bounds_coords, bounds_pxls):
+    objects = pd.DataFrame = objects
+    
+    polygons = objects[objects['mask_type'] == 'Polygon']
+    lines = objects[objects['mask_type'] == 'LineString']["object"]
+    
+    boxes = []
+    corners = []
+    for polygon in polygons.loc():
+        tag = polygon['tag']
+        if hand_palette[tag]['object_detection'].get('bbox'):
+            box = get_bbox(polygon, img_size)
+            boxes.append([tag, box])
+        if hand_palette[tag]['object_detection'].get('corner'):
+            all_corners = find_corners(polygon, bounds_coords, bounds_pxls)
+            corners.append([tag, all_corners])
+    
+    lines = list(lines)
+    crossroads = find_crossroads(lines, img_size, bounds_pxls)
+    return boxes, corners, crossroads
+
+def draw_objects(image, objects):
+    boxes, corners, crossroads = objects
+    if boxes:
+        for box in boxes:
+            tag, obj = box
+            color = hand_palette[tag]['object_detection']['bbox']['color']
+            thickness = hand_palette[tag]['object_detection']['bbox']['thickness']
+            draw_bbox(image, obj, color, thickness)
+        
+    if corners:
+        for all_corners in corners:
+            tag, objs = all_corners
+            color = hand_palette[tag]['object_detection']['bbox']['color']
+            draw_points(image, objs, color)
+    
+    if crossroads:
+        color = hand_palette['highway']['object_detection']['crossing']['color']
+        draw_points(image, crossroads, color)
+            
