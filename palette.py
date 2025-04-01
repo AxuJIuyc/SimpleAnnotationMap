@@ -63,14 +63,14 @@ hand_palette = {
         'draw_level': 4
     },
     'natural': {
-        'color': [0, 128, 0],
+        'color': [128, 128, 0],
         'geom_types': ['Polygon', 'MultiPolygon'],
         'positive_subtags': [],
         'negative_subtags': ['water'],
         'draw_level': 5
     },
     'leisure': {
-        'color': [0, 128, 0],
+        'color': [128, 128, 0],
         'geom_types': ['Polygon', 'MultiPolygon'],
         'positive_subtags': ['park'],
         'negative_subtags': [],

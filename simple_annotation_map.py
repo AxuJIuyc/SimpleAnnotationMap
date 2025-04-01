@@ -189,7 +189,7 @@ def create_objects_anno(objects, zoom, savedir, shape, dx,dy):
             x1,x2 = x1-dx, x2-dx
             y1,y2 = y1-dy, y2-dy
             
-            if x1>imw or y1>imh:
+            if x1>imw or y1>imh or x2<0 or y2<0:
                 continue
             
             row = f"{lbl} {x1} {y1} {x2} {y2}\n"
@@ -205,7 +205,7 @@ def create_objects_anno(objects, zoom, savedir, shape, dx,dy):
                 x1,x2 = max(0, x-radius), min(x+radius, imw)
                 y1, y2 = max(0, y-radius), min(y+radius, imh)
                 x1,y1,x2,y2 = map(int, [x1,y1,x2,y2])
-                if x1>imw or y1>imh:
+                if x1>imw or y1>imh or x2<0 or y2<0:
                     continue                
                 lbl = hand_palette[tag]['object_detection']['corner']['name']
                 row = f"{lbl} {x1} {y1} {x2} {y2}\n"
@@ -218,7 +218,7 @@ def create_objects_anno(objects, zoom, savedir, shape, dx,dy):
             x1,x2 = max(0, x-radius), min(x+radius, imw)
             y1, y2 = max(0, y-radius), min(y+radius, imh)
             x1,y1,x2,y2 = map(int, [x1,y1,x2,y2])
-            if x1>imw or y1>imh:
+            if x1>imw or y1>imh or x2<0 or y2<0:
                 continue            
             lbl = hand_palette['highway']['object_detection']['crossing']['name']
             row = f"{lbl} {x1} {y1} {x2} {y2}\n"
