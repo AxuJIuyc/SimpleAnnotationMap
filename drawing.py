@@ -1,12 +1,12 @@
 
-import os
+# import os
 import cv2
 from PIL import Image, ImageDraw
 
 from tqdm import tqdm
 from palette import hand_palette, scale
 import numpy as np
-from geoscale import geocoordinates_to_pixels, wgs84_to_pixels
+from geoscale import geocoordinates_to_pixels
 import pandas as pd
 
 
@@ -185,13 +185,7 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
     # Создание объектных аннотаций
     h,w,c = mask.shape
     objects = get_objects(objects, (w,h), bounds_coords, bounds_pxls)
-    draw_objects(mask, objects)
 
-    if show:
-        cv2.imshow('mask', mask)
-        cv2.waitKey(0)
-
-    cv2.destroyAllWindows()
     return mask, mask_info, objects
 
 def draw_img(polygon_coordinates, bounds_coords, bounds_pxls, 
@@ -341,6 +335,7 @@ def get_objects(objects, img_size, bounds_coords, bounds_pxls):
     return boxes, corners, crossroads
 
 def draw_objects(image, objects):
+    image = image.copy()
     boxes, corners, crossroads = objects
     if boxes:
         for box in boxes:
@@ -358,5 +353,5 @@ def draw_objects(image, objects):
     if crossroads:
         color = hand_palette['highway']['object_detection']['crossing']['color']
         draw_points(image, crossroads, color)
-            
+    return image
 

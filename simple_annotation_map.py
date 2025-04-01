@@ -1,18 +1,18 @@
 # Наложить аннотации на PNG
 import os
-
-# from pyparsing import col
-from downloader import main as download_map, wgs_to_tile
 import cv2
-from tqdm import tqdm
 import json
-from palette import hand_palette, scale
-import math
-import numpy as np
-from PIL import Image, ImageDraw
 import geojson
 
-from drawing import draw_masks, create_background
+# from pyparsing import col
+# from tqdm import tqdm
+# import math
+# import numpy as np
+# from PIL import Image, ImageDraw
+
+from downloader import main as download_map, wgs_to_tile
+from palette import hand_palette
+from drawing import draw_masks, create_background, draw_objects
 from geoscale import tile_to_lat_lon, world2pixels
 
 
@@ -134,9 +134,9 @@ def create_mapmask(
     x0, y0, x1, y1 = world2pixels(bounds, bounds_coords, bounds_pxls)
 
     # Подготовка директорий
-    mask_path = f'{save_folder}/masks'
-    source_path = f'{save_folder}/sources'
-    json_path = f'{save_folder}/jsons'
+    mask_path = f'{save_folder}'
+    source_path = f'{save_folder}'
+    json_path = f'{save_folder}'
     for dirpath in [mask_path, source_path, json_path]:
         if not os.path.exists(dirpath):
             os.makedirs(dirpath)
@@ -147,18 +147,32 @@ def create_mapmask(
     with open(f'{json_path}/{name}.json', 'w') as f:
         json.dump(mask_info, f)
     aim_area = mask[y0:y1, x0:x1]
-    cv2.imwrite(f'{mask_path}/{name}.bmp', aim_area)
+    cv2.imwrite(f'{mask_path}/{name}_seg.bmp', aim_area)
+    if show:
+        # mask = draw_objects(mask, objects)
+        cv2.imshow('mask', cv2.resize(mask, dsize=None, fx=0.5, fy=0.5))
+        cv2.waitKey(1)    
 
     # Сохранение целевой области с исходного изображения
     img = cv2.imread(path)
+    if show:
+        obj_img = draw_objects(img, objects)
+        cv2.imshow('objects', cv2.resize(obj_img, dsize=None, fx=0.3, fy=0.3))
+        cv2.imwrite(f'{source_path}/{name}_objects.bmp', obj_img)
+        cv2.waitKey(0)
     img = img[y0:y1, x0:x1]
     cv2.imwrite(f'{source_path}/{name}.bmp', img)
     
+    cv2.destroyAllWindows()
+    
     # Objects annotates
-    create_objects_anno(objects, zoom, save_folder, (x,y))
+    # dx, dy = x1-x0, y1-y0
+    h,w,_ = img.shape
+    create_objects_anno(objects, zoom, save_folder, (w,h), x0,y0)
     
     
-def create_objects_anno(objects, zoom, savedir, shape):
+    
+def create_objects_anno(objects, zoom, savedir, shape, dx,dy):
     from palette import scale_table
     boxes, corners, crossroads = objects
     mp = scale_table.loc[zoom]['m/pixel']
@@ -172,6 +186,12 @@ def create_objects_anno(objects, zoom, savedir, shape):
             lbl = hand_palette[tag]['object_detection']['bbox']['name']
             
             x1,y1,x2,y2 = map(int, xyxy)
+            x1,x2 = x1-dx, x2-dx
+            y1,y2 = y1-dy, y2-dy
+            
+            if x1>imw or y1>imh:
+                continue
+            
             row = f"{lbl} {x1} {y1} {x2} {y2}\n"
             f.write(row)
     
@@ -181,22 +201,26 @@ def create_objects_anno(objects, zoom, savedir, shape):
             for x,y in xys:
                 radius = hand_palette[tag]['object_detection']['corner']['radius'] # meters
                 radius =  radius / mp
+                x, y = x-dx, y-dy
                 x1,x2 = max(0, x-radius), min(x+radius, imw)
                 y1, y2 = max(0, y-radius), min(y+radius, imh)
-                
-                lbl = hand_palette[tag]['object_detection']['corner']['name']
                 x1,y1,x2,y2 = map(int, [x1,y1,x2,y2])
+                if x1>imw or y1>imh:
+                    continue                
+                lbl = hand_palette[tag]['object_detection']['corner']['name']
                 row = f"{lbl} {x1} {y1} {x2} {y2}\n"
                 f.write(row)
                 
         for x,y in crossroads:
             radius = hand_palette['highway']['object_detection']['crossing']['radius'] # meters
             radius =  radius / mp
+            x, y = x-dx, y-dy
             x1,x2 = max(0, x-radius), min(x+radius, imw)
             y1, y2 = max(0, y-radius), min(y+radius, imh)
-            
-            lbl = hand_palette['highway']['object_detection']['crossing']['name']
             x1,y1,x2,y2 = map(int, [x1,y1,x2,y2])
+            if x1>imw or y1>imh:
+                continue            
+            lbl = hand_palette['highway']['object_detection']['crossing']['name']
             row = f"{lbl} {x1} {y1} {x2} {y2}\n"
             f.write(row)
 

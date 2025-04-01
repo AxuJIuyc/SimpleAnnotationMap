@@ -1,4 +1,4 @@
 1.ipynb
 cache/
 __pycache__/
-data
+# data/
