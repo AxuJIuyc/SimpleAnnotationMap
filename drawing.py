@@ -1,4 +1,5 @@
 
+import os
 import cv2
 from PIL import Image, ImageDraw
 
@@ -11,7 +12,6 @@ import pandas as pd
 
 def create_mask(image, mask, color, alpha=255):
     obj = []
-    # print(mask[0])
     for x,y in mask[0]:
         obj.append((x,y))
 
@@ -141,7 +141,7 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
                 tags_dict[tag]['colors'].append((*color, alpha))  # Добавляем альфа-канал
                 
                 if hand_palette[tag].get('object_detection'):
-                    objects.append({"tag": tag, "object": poly_coords, "mask_type": 'Polygon'})
+                    objects.append({"tag": tag, "object": pixels, "mask_type": 'Polygon'})
 
         elif mask_type == 'LineString':
             pixels = np.array([geocoordinates_to_pixels(coord, bounds_coords, bounds_pxls) 
@@ -159,13 +159,11 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
             tags_dict[tag]['colors'].append(color)
             
             if hand_palette[tag].get('object_detection'):
-                    objects.append({"tag": tag, "object": coordinates, "mask_type": mask_type})            
+                objects.append({"tag": tag, "object": coordinates, "mask_type": mask_type})            
 
         else:
             print('other')
 
-        # if isinstance(pixels, list):
-            # print(pixels)
         mask_info.append({'tag': map_obj['properties']['tag'], 
                           'subtag': map_obj['properties']['subtag'], 
                           'coords': pixels.tolist() if not isinstance(pixels, list) else pixels, 
@@ -184,6 +182,7 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
         for polyline, color, thickness in zip(group['polylines'], group['colors'], group['line_thicknesses']):
             mask = cv2.polylines(mask, [polyline], isClosed=False, color=color, thickness=int(thickness))
 
+    # Создание объектных аннотаций
     h,w,c = mask.shape
     objects = get_objects(objects, (w,h), bounds_coords, bounds_pxls)
     draw_objects(mask, objects)
@@ -193,7 +192,7 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
         cv2.waitKey(0)
 
     cv2.destroyAllWindows()
-    return mask, mask_info
+    return mask, mask_info, objects
 
 def draw_img(polygon_coordinates, bounds_coords, bounds_pxls, 
              mask_type, map_obj, img, line_thickness=3, opacity=1):
@@ -230,21 +229,28 @@ def create_background(shape, color):
 
     return np.asarray(image)[:,:,::-1]
 
+def get_bounds(polygon):
+    polygon = np.array(polygon)
+    x2,y2 = polygon.max(axis=0)
+    x1,y1 = polygon.min(axis=0)
+    return (x1,y1,x2,y2)
+    
 
 def get_bbox(polygon, img_size):
     # Получаем границы (Bounding Box)
-    min_x, min_y, max_x, max_y = polygon.bounds
-
-    # Конвертируем границы в пиксели
-    bbox_pixels = wgs84_to_pixels(
-        [(min_x, min_y), (max_x, max_y)], 
-        img_size, 
-        (min_x, min_y, max_x, max_y)
-    )
+    min_x, min_y, max_x, max_y = get_bounds(polygon)
+    
+    bbox_pixels = [min_x, min_y, max_x, max_y]
+    # # Конвертируем границы в пиксели
+    # bbox_pixels = wgs84_to_pixels(
+    #     [(min_x, min_y), (max_x, max_y)], 
+    #     img_size, 
+    #     (min_x, min_y, max_x, max_y)
+    # )
     return bbox_pixels
 
 def draw_bbox(image, bbox_pixels, color=(255,0,0), thickness=2):
-    (x_min_pix, y_max_pix), (x_max_pix, y_min_pix) = bbox_pixels  # OpenCV (0,0) — верхний левый угол
+    x_min_pix, y_min_pix, x_max_pix, y_max_pix = map(int, bbox_pixels)  # OpenCV (0,0) — верхний левый угол
     # Рисуем Bounding Box
     cv2.rectangle(image, (x_min_pix, y_min_pix), (x_max_pix, y_max_pix), color, thickness)  # Жёлтая рамка
     return image
@@ -253,12 +259,13 @@ def angle_between_vectors(v1, v2):
     dot_product = np.dot(v1, v2)
     norm_v1 = np.linalg.norm(v1)
     norm_v2 = np.linalg.norm(v2)
-    angle = np.arccos(dot_product / (norm_v1 * norm_v2))  # Радианы
+    angle = np.arccos(dot_product / (norm_v1 * norm_v2+1e-5))  # Радианы
     return np.degrees(angle)  # Переводим в градусы
 
 def find_corners(polygon, bounds_coords, bounds_pxls):
     # Найдём углы узлов внешнего контура
-    polygon_coords = list(polygon.coords)
+    # polygon_coords = list(polygon.coords)
+    polygon_coords = polygon[:-1]
     angles = []
 
     for i in range(len(polygon_coords)):
@@ -270,57 +277,67 @@ def find_corners(polygon, bounds_coords, bounds_pxls):
         v2 = p2 - p1  # Вектор текущий->следующий
 
         angle = angle_between_vectors(v1, v2)
-        if 30 <= angle <= 150:
-            angles.append((tuple(p1), angle))
-    return [geocoordinates_to_pixels(angle, bounds_coords, bounds_pxls) for angle in angles]
+        # if 30 <= angle <= 150:
+            # angles.append((tuple(p1), angle))
+        angles.append([*p1, angle])
+    # return [geocoordinates_to_pixels(angle, bounds_coords, bounds_pxls) for angle in angles]
+    angles = np.array(angles)
+    angles = angles[angles[:,2] <= 150]
+    angles = angles[angles[:,2] >= 30]
+    return angles[:,:2]
 
-def find_crossroads(roads, img_size, bounds_pxls):
+def find_crossroads(roads, bounds_coords, bounds_pxls):
+    from shapely import LineString
     # Список дорог
     # roads = [road_1, road_2, road_3]
     min_x, min_y, max_x, max_y = bounds_pxls
 
+    roads = [LineString(road) for road in roads]
     # Найдём все пересечения
     intersection_points = []
-
     for i in range(len(roads)):
         for j in range(i + 1, len(roads)):
             intersection = roads[i].intersection(roads[j])
             if intersection.is_empty:
                 continue  # Нет пересечения
             if intersection.geom_type == "Point":
-                intersection_points.append(intersection)
+                intersection_points.append(intersection.coords[0])
 
     # Конвертируем в пиксели
-    intersection_pixels = [wgs84_to_pixels([point.coords[0]], img_size, (min_x, min_y, max_x, max_y))[0]
-                        for point in intersection_points]
+    intersection_pixels = [geocoordinates_to_pixels(
+        point, 
+        bounds_coords, 
+        bounds_pxls
+    ) for point in intersection_points]
 
     return intersection_pixels
 
 def draw_points(image, intersection_pixels, color=None, rad=5, thickness=-1):
     # Отрисовка точек перекрёстков
     for pt in intersection_pixels:
-        cv2.circle(image, tuple(pt), rad, color, thickness)  # Жёлтые точки
+        pt = map(int, pt)
+        cv2.circle(image, tuple(pt), rad, color[::-1], thickness)  # Жёлтые точки
     return image
 
 def get_objects(objects, img_size, bounds_coords, bounds_pxls):
-    objects = pd.DataFrame = objects
+    objects = pd.DataFrame(objects)
     
     polygons = objects[objects['mask_type'] == 'Polygon']
     lines = objects[objects['mask_type'] == 'LineString']["object"]
     
     boxes = []
     corners = []
-    for polygon in polygons.loc():
+    for _, polygon in polygons.iterrows():
         tag = polygon['tag']
         if hand_palette[tag]['object_detection'].get('bbox'):
-            box = get_bbox(polygon, img_size)
+            box = get_bbox(polygon['object'], img_size)
             boxes.append([tag, box])
         if hand_palette[tag]['object_detection'].get('corner'):
-            all_corners = find_corners(polygon, bounds_coords, bounds_pxls)
+            all_corners = find_corners(polygon['object'], bounds_coords, bounds_pxls)
             corners.append([tag, all_corners])
     
     lines = list(lines)
-    crossroads = find_crossroads(lines, img_size, bounds_pxls)
+    crossroads = find_crossroads(lines, bounds_coords, bounds_pxls)
     return boxes, corners, crossroads
 
 def draw_objects(image, objects):
@@ -335,10 +352,11 @@ def draw_objects(image, objects):
     if corners:
         for all_corners in corners:
             tag, objs = all_corners
-            color = hand_palette[tag]['object_detection']['bbox']['color']
+            color = hand_palette[tag]['object_detection']['corner']['color']
             draw_points(image, objs, color)
     
     if crossroads:
         color = hand_palette['highway']['object_detection']['crossing']['color']
         draw_points(image, crossroads, color)
             
+

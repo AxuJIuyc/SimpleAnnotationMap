@@ -143,7 +143,7 @@ def create_mapmask(
 
     print("Image shape (H,W):", img.shape[:2])
     # Вычисление и отрисовка масок
-    mask, mask_info = draw_masks(img, features, bounds_coords, bounds_pxls, zoom, opacity=opacity, show=show) 
+    mask, mask_info, objects = draw_masks(img, features, bounds_coords, bounds_pxls, zoom, opacity=opacity, show=show) 
     with open(f'{json_path}/{name}.json', 'w') as f:
         json.dump(mask_info, f)
     aim_area = mask[y0:y1, x0:x1]
@@ -153,6 +153,53 @@ def create_mapmask(
     img = cv2.imread(path)
     img = img[y0:y1, x0:x1]
     cv2.imwrite(f'{source_path}/{name}.bmp', img)
+    
+    # Objects annotates
+    create_objects_anno(objects, zoom, save_folder, (x,y))
+    
+    
+def create_objects_anno(objects, zoom, savedir, shape):
+    from palette import scale_table
+    boxes, corners, crossroads = objects
+    mp = scale_table.loc[zoom]['m/pixel']
+    imw, imh = shape
+    
+    
+    filepath = os.path.join(savedir, 'boxes_annotates.txt')
+    with open(filepath, 'w') as f:
+        for box in boxes:
+            tag, xyxy = box
+            lbl = hand_palette[tag]['object_detection']['bbox']['name']
+            
+            x1,y1,x2,y2 = map(int, xyxy)
+            row = f"{lbl} {x1} {y1} {x2} {y2}\n"
+            f.write(row)
+    
+    filepath = os.path.join(savedir, 'corners_annotates.txt')
+    with open(filepath, 'w') as f:
+        for tag, xys in corners:
+            for x,y in xys:
+                radius = hand_palette[tag]['object_detection']['corner']['radius'] # meters
+                radius =  radius / mp
+                x1,x2 = max(0, x-radius), min(x+radius, imw)
+                y1, y2 = max(0, y-radius), min(y+radius, imh)
+                
+                lbl = hand_palette[tag]['object_detection']['corner']['name']
+                x1,y1,x2,y2 = map(int, [x1,y1,x2,y2])
+                row = f"{lbl} {x1} {y1} {x2} {y2}\n"
+                f.write(row)
+                
+        for x,y in crossroads:
+            radius = hand_palette['highway']['object_detection']['crossing']['radius'] # meters
+            radius =  radius / mp
+            x1,x2 = max(0, x-radius), min(x+radius, imw)
+            y1, y2 = max(0, y-radius), min(y+radius, imh)
+            
+            lbl = hand_palette['highway']['object_detection']['crossing']['name']
+            x1,y1,x2,y2 = map(int, [x1,y1,x2,y2])
+            row = f"{lbl} {x1} {y1} {x2} {y2}\n"
+            f.write(row)
+
     
 # +++++++++++++++++++++
 if __name__ == "__main__":

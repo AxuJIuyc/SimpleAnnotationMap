@@ -25,7 +25,7 @@ hand_palette = {
         'avg_width': 3.25,
         'draw_level': 2,
         'object_detection': {
-            'crossing': {'draw':True, 'color':(255,255,255), 'thickness':4},
+            'crossing': {'draw':True, 'color':(255,100,100), 'thickness':4, 'name': 'crossroads', 'radius': 10},
         },        
     },
     'footway': {
@@ -36,7 +36,7 @@ hand_palette = {
         'avg_width': 2,
         'draw_level': 2,
         'object_detection': {
-            'crossing': {'draw':True, 'color':(255,255,255), 'thickness':4},
+            'crossing': {'draw':True, 'color':(255,100,100), 'thickness':4, 'name': 'crossroads', 'radius': 5},
         }
     },
     'sport': {
@@ -53,28 +53,6 @@ hand_palette = {
         'negative_subtags': ['constraction'],
         'avg_width': 2.5,
         'draw_level': 3
-    },
-    'building': {
-        'color': [0, 0, 128],
-        'geom_types': ['Polygon'],
-        'positive_subtags': [],
-        'negative_subtags': [],
-        'draw_level': 4,
-        'object_detection': {
-            'bbox': {'draw':True, 'color':(255,255,255), 'thickness':4},
-            'corner': {'draw':True, 'color':(100,100,100), 'thickness':2}            
-        }
-    },
-    'shop': {
-        'color': [0, 0, 128],
-        'geom_types': ['Polygon', 'MultiPolygon'],
-        'positive_subtags': ['park'],
-        'negative_subtags': [],
-        'draw_level': 4,
-        'object_detection': {
-            'bbox': {'draw':True, 'color':(255,255,255), 'thickness':4},
-            'corner': {'draw':True, 'color':(100,100,100), 'thickness':2}            
-        }
     },
     'constraction': {
         'color': [0, 0, 0],
@@ -97,6 +75,28 @@ hand_palette = {
         'positive_subtags': ['park'],
         'negative_subtags': [],
         'draw_level': 5
+    },
+    'building': {
+        'color': [0, 0, 128],
+        'geom_types': ['Polygon'],
+        'positive_subtags': [],
+        'negative_subtags': [],
+        'draw_level': 6,
+        'object_detection': {
+            'bbox': {'draw':True, 'color':(255,255,255), 'thickness':4, 'name': 'roof'},
+            'corner': {'draw':True, 'color':(100,100,255), 'thickness':2, 'name': 'roof_corner', 'radius': 1.5}            
+        }
+    },
+    'shop': {
+        'color': [0, 0, 128],
+        'geom_types': ['Polygon', 'MultiPolygon'],
+        'positive_subtags': ['park'],
+        'negative_subtags': [],
+        'draw_level': 6,
+        'object_detection': {
+            'bbox': {'draw':True, 'color':(255,255,255), 'thickness':4, 'name': 'roof'},
+            'corner': {'draw':True, 'color':(100,100,255), 'thickness':2, 'name': 'roof_corner', 'radius': 1.5}            
+        }
     },
 }
 
@@ -122,7 +122,7 @@ def hex2rgb(hex_color):
 
 scale_table = pd.DataFrame(
     [
-        [1,                     360,    156_543, "1:500*1e6",   "whole world"],
+        [1,                     360,    156_543, "1:500*1e6",   "whole world"], # 0
         [4,                     180,    78_272, "1:250*1e6",    ""],
         [16,                    90,     39_136, "1:150*1e6",    "subcontinental area"],
         [64,                    45,     19_568, "1:70*1e6",     "largest country"],
@@ -132,7 +132,7 @@ scale_table = pd.DataFrame(
         [16_384,                2.813,  1223,   "1:4*1e6",      "small country, US state"],
         [65_536,                1.406,  611.496, "1:2*1e6",     ""],
         [262_144,               0.703,  305.748, "1:1*1e6",     "wide area, large metropolitan area"],
-        [1_048_576,             0.352,  152.874, "1:500*1e3",   "metropolitan area"],
+        [1_048_576,             0.352,  152.874, "1:500*1e3",   "metropolitan area"], # 10
         [4_194_304,             0.176,  76.437, "1:250*1e3",    "city"],
         [16_777_216,            0.088,  38.219, "1:150*1e3",    "town or city district"],
         [67_108_864,            0.044,  19.109, "1:70*1e3",     "village, or suburb"],
@@ -142,7 +142,7 @@ scale_table = pd.DataFrame(
         [17_179_869_184,        0.003,  1.194,  "1:4*1e3",      "block, park, addresses"],
         [68_719_476_736,        0.001,  0.597,  "1:2*1e3",      "some buildings, trees"],
         [274_877_906_944,       0.0005, 0.299,  "1:1*1e3",      "local highway and crossing details"],
-        [1_099_511_627_776,     0.00025, 0.149, "1:5*1e2",      "A mid0sized builing"],
+        [1_099_511_627_776,     0.00025, 0.149, "1:5*1e2",      "A mid0sized builing"], # 20
     ], 
     columns=[
         "Tiles", 
