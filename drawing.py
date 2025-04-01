@@ -123,9 +123,8 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
                     print(f"inner {tag}, broken\n")
                     continue
                 
-                for p in inner_coords:
-                    pp = [geocoordinates_to_pixels(coord, bounds_coords, bounds_pxls) for coord in p]
-                    inner_contours.append(pp)
+                inner_contours = get_inner_contours(inner_coords, bounds_coords, bounds_pxls)
+                    
                 pixels = [outer_contour, inner_contours]
                 tags_dict[tag]['multipolygons'].append(pixels)
                 tags_dict[tag]['colors'].append((*color, alpha))  # Добавляем альфа-канал
@@ -187,6 +186,17 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
     objects = get_objects(objects, (w,h), bounds_coords, bounds_pxls)
 
     return mask, mask_info, objects
+
+def get_inner_contours(inner_coords, bounds_coords, bounds_pxls):
+    inner_contours = []
+    for p in inner_coords:
+        try:
+            pp = [geocoordinates_to_pixels(coord, bounds_coords, bounds_pxls) for coord in p]
+            inner_contours.append(pp)
+        except Exception:
+            pp = get_inner_contours(p, bounds_coords, bounds_pxls)
+            inner_contours.extend(pp)
+    return inner_contours
 
 def draw_img(polygon_coordinates, bounds_coords, bounds_pxls, 
              mask_type, map_obj, img, line_thickness=3, opacity=1):

@@ -45,14 +45,14 @@ def add_feature(map, feature_collection, feature, color, opacity, tag):
     geojson_feature['properties']['subtag'] = feature[tag]
     
     if 'avg_width' in hand_palette[tag]:
-        # if 'lanes' in feature:
-        lanes = feature['lanes']
-        if pd.notna(lanes):
-            geojson_feature['properties']['lanes'] = lanes
-        # if 'width' in feature:    
-        width = feature['width']
-        if pd.notna(width):
-            geojson_feature['properties']['width'] = width 
+        if 'lanes' in feature:
+            lanes = feature['lanes']
+            if pd.notna(lanes):
+                geojson_feature['properties']['lanes'] = lanes
+        if 'width' in feature:    
+            width = feature['width']
+            if pd.notna(width):
+                geojson_feature['properties']['width'] = width 
         
     feature_collection['features'].append(geojson_feature)
     

@@ -1,4 +1,5 @@
 1.ipynb
 cache/
 __pycache__/
-# data/
+data/
+collect_data.py
