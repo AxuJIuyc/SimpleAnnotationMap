@@ -35,5 +35,5 @@ At the output you will get:
 5) .json with pixel coordinates all objects
 6) .txt objects annotated files with bboxes
 
-Use multi_extractor for automatic saving many images
+<!-- Use multi_extractor for automatic saving many images -->  
 You need redact 'hand_palette' or create new function in palette.py for add new tags
