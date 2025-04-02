@@ -27,6 +27,11 @@ def custom_sort_key(item):
         return (1, hand_palette[tag].get('draw_level', 100))
     else:
         return (2, hand_palette[tag].get('draw_level', 100))
+
+def custom_sort_key_2(item):
+    # geometry_type = item['geometry']['type']
+    tag = item['properties']['tag']
+    return hand_palette[tag].get('draw_level', 100)
   
 def def_aim_area(bounds):
     """
@@ -80,7 +85,8 @@ def geojson_sort(gj, criterion=custom_sort_key):
     for obj in gj['features']:
         if obj['geometry']['type'] != 'Point':
             features.append(obj) 
-    features = sorted(features, key=criterion) ##############
+    
+    features = sorted(features, key=criterion) ##############    
     return features
 
 
@@ -105,8 +111,8 @@ def create_mapmask(
     with open(geo_json) as f:
         gj = geojson.load(f)
 
-    # Сортировка аннотаций для корректной отрисовки
-    features = geojson_sort(gj, criterion=custom_sort_key)
+    # # Сортировка аннотаций для корректной отрисовки
+    # features = geojson_sort(gj, criterion=custom_sort_key)
 
     download_path = f'{save_folder}/download'
     os.makedirs(download_path, exist_ok=True) 
@@ -143,6 +149,8 @@ def create_mapmask(
 
     print("Image shape (H,W):", img.shape[:2])
     # Вычисление и отрисовка масок
+    # Сортировка аннотаций для корректной отрисовки
+    features = geojson_sort(gj, criterion=custom_sort_key_2)
     mask, mask_info, objects = draw_masks(img, features, bounds_coords, bounds_pxls, zoom, opacity=opacity, show=show) 
     with open(f'{json_path}/{name}.json', 'w') as f:
         json.dump(mask_info, f)

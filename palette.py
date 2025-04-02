@@ -3,13 +3,6 @@ import pandas as pd
 
 # ============================= Palettes =======================================
 hand_palette = {
-    'landuse': {
-        'color': [128, 128, 0],
-        'geom_types': ['Polygon', 'MultiPolygon'],
-        'positive_subtags': [],
-        'negative_subtags': [],
-        'draw_level': 1
-    },
     'water': {
         'color': [0, 128, 128],
         'geom_types': ['Polygon', 'MultiPolygon'],
@@ -17,13 +10,42 @@ hand_palette = {
         'negative_subtags': [],
         'draw_level': 0
     },
+    'landuse': {
+        'color': [128, 128, 0],
+        'geom_types': ['Polygon', 'MultiPolygon'],
+        'positive_subtags': [],
+        'negative_subtags': [],
+        'draw_level': 1
+    },
+    'natural': {
+        'color': [128, 128, 0],
+        'geom_types': ['Polygon', 'MultiPolygon'],
+        'positive_subtags': [],
+        'negative_subtags': ['water'],
+        'draw_level': 2
+    },
+    'leisure': {
+        'color': [128, 128, 0],
+        'geom_types': ['Polygon', 'MultiPolygon'],
+        'positive_subtags': ['park'],
+        'negative_subtags': [],
+        'draw_level': 2
+    },
+    'constraction': {
+        'color': [0, 0, 0],
+        'geom_types': ['LineString'],
+        'positive_subtags': [],
+        'negative_subtags': ['subway'],
+        'avg_width': 1.5,
+        'draw_level': 3
+    },
     'highway': {
         'color': [128, 0, 0],
         'geom_types': ['LineString'],
         'positive_subtags': [],
         'negative_subtags': ['footway', 'steps'],
         'avg_width': 3.25,
-        'draw_level': 2,
+        'draw_level': 3,
         'object_detection': {
             'crossing': {'draw':True, 'color':(255,100,100), 'thickness':4, 'name': 'crossroads', 'radius': 10},
         },        
@@ -34,7 +56,7 @@ hand_palette = {
         'positive_subtags': ['sidewalk'],
         'negative_subtags': [],
         'avg_width': 2,
-        'draw_level': 2,
+        'draw_level': 3,
         'object_detection': {
             'crossing': {'draw':True, 'color':(255,100,100), 'thickness':4, 'name': 'crossroads', 'radius': 5},
         }
@@ -44,7 +66,7 @@ hand_palette = {
         'geom_types': ['Polygon', 'MultiPolygon'],
         'positive_subtags': ['running'],
         'negative_subtags': [],
-        'draw_level': 2
+        'draw_level': 3
     },
     'railway': {
         'color': [128, 0, 128],
@@ -52,36 +74,14 @@ hand_palette = {
         'positive_subtags': ['rail'],
         'negative_subtags': ['constraction'],
         'avg_width': 2.5,
-        'draw_level': 3
-    },
-    'constraction': {
-        'color': [0, 0, 0],
-        'geom_types': ['LineString'],
-        'positive_subtags': [],
-        'negative_subtags': ['subway'],
-        'avg_width': 1.5,
         'draw_level': 4
-    },
-    'natural': {
-        'color': [128, 128, 0],
-        'geom_types': ['Polygon', 'MultiPolygon'],
-        'positive_subtags': [],
-        'negative_subtags': ['water'],
-        'draw_level': 5
-    },
-    'leisure': {
-        'color': [128, 128, 0],
-        'geom_types': ['Polygon', 'MultiPolygon'],
-        'positive_subtags': ['park'],
-        'negative_subtags': [],
-        'draw_level': 5
     },
     'building': {
         'color': [0, 0, 128],
         'geom_types': ['Polygon'],
         'positive_subtags': [],
         'negative_subtags': [],
-        'draw_level': 6,
+        'draw_level': 5,
         'object_detection': {
             'bbox': {'draw':True, 'color':(255,255,255), 'thickness':4, 'name': 'roof'},
             'corner': {'draw':True, 'color':(100,100,255), 'thickness':2, 'name': 'roof_corner', 'radius': 1.5}            
@@ -92,7 +92,7 @@ hand_palette = {
         'geom_types': ['Polygon', 'MultiPolygon'],
         'positive_subtags': ['park'],
         'negative_subtags': [],
-        'draw_level': 6,
+        'draw_level': 5,
         'object_detection': {
             'bbox': {'draw':True, 'color':(255,255,255), 'thickness':4, 'name': 'roof'},
             'corner': {'draw':True, 'color':(100,100,255), 'thickness':2, 'name': 'roof_corner', 'radius': 1.5}            

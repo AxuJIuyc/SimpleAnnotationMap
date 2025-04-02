@@ -56,18 +56,21 @@ def draw_filled_multipolygon(image, mp, color):
     Заполняет пространство между полигонами в мультиполигоне, сохраняя фон внутри фигур.
     """
     mask = np.zeros(image.shape[:2], dtype=np.uint8)
-    outer_contour, inner_contours = mp
     
-    outer_contour = np.array(outer_contour)
-    cv2.fillPoly(mask, [outer_contour], 255)  # Заполняем внешний контур
-    for hole in inner_contours:
-        hole = np.array(hole)
-        cv2.fillPoly(mask, [hole], 0)  # Вырезаем внутренние отверстия
+    for ps in mp:
+        outer_contour, inner_contours = ps
+         
+        outer_contour = np.array(outer_contour)
+        cv2.fillPoly(mask, [outer_contour], 255)  # Заполняем внешний контур
+        
+        for hole in inner_contours:
+            hole = np.array(hole)
+            cv2.fillPoly(mask, [hole], 0)  # Вырезаем внутренние отверстия
 
-    # Закрашиваем маску цветом
-    color_bgr = color[:3]  # Берем только 3 канала (BGR)
-    color_layer = np.full_like(image, color_bgr, dtype=np.uint8)
-    image[mask == 255] = color_layer[mask == 255]
+        # Закрашиваем маску цветом
+        color_bgr = color[:3]  # Берем только 3 канала (BGR)
+        color_layer = np.full_like(image, color_bgr, dtype=np.uint8)
+        image[mask == 255] = color_layer[mask == 255]
     
     return image
     
@@ -96,42 +99,37 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
         
         if mask_type in ['Polygon', 'MultiPolygon']:
             if len(coordinates) > 1:
+                externals_internals = split_polygons(coordinates)
+ 
+                polygones = []
                 # Обрабатываем внешний контур
-                # Обработка кривых массивов (вместо одинарной вложенности может появиться двойная)
-                outer_coords =  coordinates[0]
-                try:
-                    while len(outer_coords) == 1:
-                        outer_coords = outer_coords[0]
-                except Exception as ex:
-                    print(ex)
-                    print(f"outer {tag}, broken\n")
-                    continue
+                for ps in externals_internals:
+                    external, internals = ps.values()
+                    outer_contour = [
+                        geocoordinates_to_pixels(coord, bounds_coords, bounds_pxls) 
+                            for coord in external[0]
+                    ]
+                    if hand_palette[tag].get('object_detection'):
+                        objects.append({
+                            "tag": tag, 
+                            "object": outer_contour, 
+                            "mask_type": 'Polygon'})
 
-                outer_contour = [
-                    geocoordinates_to_pixels(coord, bounds_coords, bounds_pxls) 
-                        for coord in outer_coords
-                ]
-                
-                # Обрабатываем внутренние контуры
-                inner_contours = []
-                inner_coords = coordinates[1:]
-                try:
-                    while len(inner_coords[0]) < 3:
-                        inner_coords = inner_coords[0]
-                except Exception as ex:
-                    print(ex)
-                    print(f"inner {tag}, broken\n")
-                    continue
-                
-                inner_contours = get_inner_contours(inner_coords, bounds_coords, bounds_pxls)
+                    # Обрабатываем внутренние контуры
+                    inner_contours = []
+                    for inner_coords in internals:
+                        inner_contour = [
+                            geocoordinates_to_pixels(coord, bounds_coords, bounds_pxls) 
+                                for coord in inner_coords
+                        ]
+                        inner_contours.append(inner_contour)
+                    polygones.append([outer_contour, inner_contours])
+
                     
-                pixels = [outer_contour, inner_contours]
+                pixels = polygones
                 tags_dict[tag]['multipolygons'].append(pixels)
                 tags_dict[tag]['colors'].append((*color, alpha))  # Добавляем альфа-канал
                 
-                if hand_palette[tag].get('object_detection'):
-                    objects.append({"tag": tag, "object": outer_contour, "mask_type": 'Polygon'})
-
             else:
                 poly_coords = coordinates[0]
                 pixels = np.array([geocoordinates_to_pixels(coord, bounds_coords, bounds_pxls) 
@@ -176,7 +174,6 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
             mask = cv2.fillPoly(mask, [polygon], color)
         for mp, color in zip(group['multipolygons'], group['colors']):
             mask = draw_filled_multipolygon(mask, mp, color)
-        
         # Затем отрисовываем линии для этого тега
         for polyline, color, thickness in zip(group['polylines'], group['colors'], group['line_thicknesses']):
             mask = cv2.polylines(mask, [polyline], isClosed=False, color=color, thickness=int(thickness))
@@ -186,6 +183,31 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
     objects = get_objects(objects, (w,h), bounds_coords, bounds_pxls)
 
     return mask, mask_info, objects
+
+def split_polygons(polygons):
+    """
+    Разделяет список полигонов на внешние и внутренние.
+    Внешний полигон — первый в списке. Вложенные списки обрабатываются рекурсивно.
+    """
+    external = []
+    internal = []
+    ps = []
+
+    for poly in polygons:
+        if isinstance(poly[0][0], list):  # Если первый элемент - список, значит, это вложенная структура
+            ps.append(*split_polygons(poly))
+            # external.extend(outer)  # Добавляем внешние
+            # internal.extend(inner)  # Добавляем внутренние
+        else:
+            if not external:  # Первый полигон в группе — внешний
+                external.append(poly)
+            else:
+                internal.append(poly)
+
+    if external:
+        ps.append({"external": external, "internal": internal})
+
+    return ps
 
 def get_inner_contours(inner_coords, bounds_coords, bounds_pxls):
     inner_contours = []
