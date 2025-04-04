@@ -1,5 +1,6 @@
 
 # import os
+import re
 import cv2
 from PIL import Image, ImageDraw
 
@@ -144,6 +145,10 @@ def draw_masks(mask, features, bounds_coords, bounds_pxls, zoom, opacity=1, show
             pixels = np.array([geocoordinates_to_pixels(coord, bounds_coords, bounds_pxls) 
                                 for coord in coordinates], dtype=np.int32)
             width = map_obj['properties'].get('width', None)
+            if width:
+                template = "[-+]?\\d+(?:[.,]\\d+)?"
+                match = re.search(rf"{template}", width)
+                width = float(match[0].replace(',', '.'))
             lanes = map_obj['properties'].get('lanes', None)
             tag = map_obj['properties']['tag']
             line_thickness = hand_palette[tag].get('avg_width', 3)
