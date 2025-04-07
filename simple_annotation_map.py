@@ -163,10 +163,10 @@ def create_mapmask(
 
     # Сохранение целевой области с исходного изображения
     img = cv2.imread(path)
+    obj_img = draw_objects(img, objects)
+    cv2.imwrite(f'{source_path}/{name}_objects.bmp', obj_img)
     if show:
-        obj_img = draw_objects(img, objects)
         cv2.imshow('objects', cv2.resize(obj_img, dsize=None, fx=0.3, fy=0.3))
-        cv2.imwrite(f'{source_path}/{name}_objects.bmp', obj_img)
         cv2.waitKey(0)
     img = img[y0:y1, x0:x1]
     cv2.imwrite(f'{source_path}/{name}.bmp', img)
